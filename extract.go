@@ -131,29 +131,37 @@ func (e *Extractor) archiveDocument(ctx context.Context, format string, r io.Rea
 	w := &archiveWalker{ctx: ctx, maxMember: gofastcore.ResolveLimit(e.MaxMemberBytes, DefaultMaxMemberBytes),
 		left: max(decode.Left(), 0)}
 	members, over := 0, 0
-	start := w.left
 	err := w.walk(format, r, size, opts.Name, func(m Member) error {
+		if m.Release != nil {
+			defer m.Release()
+		}
 		if members == maxMembers {
 			over++
 			return nil
 		}
 		members++
+		// Past the bound the members are counted, not decompressed.
+		w.counting = members == maxMembers
+		// The child takes from the budget what the walk has left, and the
+		// walk then has what the child left.
+		decode.Settle(w.left)
 		doc.Children = append(doc.Children, opts.ExtractChild(ctx, m.Path, "", m.R, m.Size))
-		if m.Release != nil {
-			m.Release()
-		}
+		w.left = max(decode.Left(), 0)
 		return nil
 	}, func(s Skipped) {
 		child := gofastcore.New("")
 		child.Source = gofastcore.Source{Name: s.Path}
 		sev, code := gofastcore.SeverityWarning, gofastcore.WarnChildNotExtracted
-		if s.Limit {
+		switch {
+		case s.Limit:
 			sev, code = gofastcore.SeverityError, gofastcore.WarnLimitExceeded
+		case s.Note:
+			sev = gofastcore.SeverityInfo
 		}
 		child.Warn(sev, code, s.Reason)
 		doc.Children = append(doc.Children, child)
 	})
-	decode.Take(start - max(w.left, 0))
+	decode.Settle(max(w.left, 0))
 	switch {
 	case errors.Is(err, errBudget):
 		doc.Warn(gofastcore.SeverityError, gofastcore.WarnLimitExceeded,

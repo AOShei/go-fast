@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"path"
 	"slices"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 )
@@ -33,6 +35,11 @@ const (
 	DefaultMaxArchiveMembers = 10000
 )
 
+// deflateRatio bounds how many bytes deflate can make of one: 1,032 at
+// most. A member said to be larger than its compressed size allows is
+// not believed, and no more than the size allowed is set aside for it.
+const deflateRatio = 1032
+
 // Member is one file in an archive.
 type Member struct {
 	// Path is the member's name in the archive, slash-separated, with no
@@ -44,8 +51,10 @@ type Member struct {
 	R io.ReaderAt
 	// Release, when not nil, is called once the member's bytes are no
 	// longer needed: it gives back what WalkOptions.Hold accounted for
-	// them.
+	// them, and for an archive the member is in that was held for it.
 	Release func()
+
+	held int64 // what Hold accounted for the bytes
 }
 
 // Skipped is a member that was not read, and why.
@@ -56,6 +65,9 @@ type Skipped struct {
 	// a member that cannot be read: encrypted, compressed with a method
 	// not supported, damaged).
 	Limit bool
+	// Note says that nothing is missing: the member is another name for
+	// one that is read (a tar hard link).
+	Note bool
 }
 
 // ErrArchive wraps an archive that cannot be read at all.
@@ -69,18 +81,22 @@ type archiveWalker struct {
 	// decompressed in this walk.
 	maxMember int64
 	left      int64
-	// hold is called before a member's bytes are held in memory, and its
-	// result after they are no longer needed (nil: no accounting).
-	hold func(n int64) func()
+	// hold accounts for bytes about to be held in memory; own is what
+	// the walk itself holds at the moment (the archives it is inside).
+	hold func(n, own int64) (func(), error)
+	own  int64
+	// counting: members are given to fn without their bytes (R nil),
+	// to be counted, and none is decompressed but as the walk must.
+	counting bool
 }
 
 // errBudget stops a walk whose decompression bound is reached.
 var errBudget = errors.New("the bound on bytes decompressed from the archive was reached")
 
 // walk calls fn for every regular file of the archive r, in the order the
-// archive stores them, and skip for every member left out. A member held
-// in memory is released when fn returns. A nested archive is a member like
-// any other: the caller decides whether to open it.
+// archive stores them, and skip for every member left out. fn owns each
+// member and calls its Release. A nested archive is a member like any
+// other: the caller decides whether to open it.
 func (w *archiveWalker) walk(format string, r io.ReaderAt, size int64, gzName string,
 	fn func(Member) error, skip func(Skipped)) error {
 	switch format {
@@ -121,16 +137,28 @@ func (w *archiveWalker) walkZip(r io.ReaderAt, size int64, fn func(Member) error
 		}
 		var m Member
 		switch {
+		case w.counting:
+			m = Member{Path: name, Size: int64(min(f.UncompressedSize64, math.MaxInt64))}
 		case f.Method == zip.Store && f.CompressedSize64 == f.UncompressedSize64:
 			off, err := f.DataOffset()
-			if err != nil || off < 0 || off > size || int64(f.UncompressedSize64) > size-off {
+			if err != nil || off < 0 || off > size || f.UncompressedSize64 > uint64(size-off) {
 				skip(Skipped{Path: name, Reason: "damaged"})
 				continue
 			}
 			m = Member{Path: name, Size: int64(f.UncompressedSize64), R: io.NewSectionReader(r, off, int64(f.UncompressedSize64))}
 		default:
-			if int64(f.UncompressedSize64) > w.maxMember || f.UncompressedSize64 > 1<<62 {
+			if f.CompressedSize64 > uint64(size) {
+				skip(Skipped{Path: name, Reason: "damaged"})
+				continue
+			}
+			if f.UncompressedSize64 > uint64(w.maxMember) {
 				skip(Skipped{Path: name, Reason: fmt.Sprintf("larger than %d bytes decompressed", w.maxMember), Limit: true})
+				continue
+			}
+			// No more than deflate can make of the compressed bytes is
+			// believed: a member said to be larger is damaged.
+			if f.UncompressedSize64 > f.CompressedSize64*deflateRatio+1024 {
+				skip(Skipped{Path: name, Reason: "damaged: its size is more than its compressed size allows"})
 				continue
 			}
 			rc, err := f.Open()
@@ -142,16 +170,16 @@ func (w *archiveWalker) walkZip(r io.ReaderAt, size int64, fn func(Member) error
 				skip(Skipped{Path: name, Reason: reason})
 				continue
 			}
-			data, rel, err := w.read(rc, int64(f.UncompressedSize64), true)
+			var rerr error
+			m, rerr = w.read(name, rc, int64(f.UncompressedSize64), int64(f.UncompressedSize64), true)
 			rc.Close()
-			if errors.Is(err, errBudget) {
-				return err
+			if errors.Is(rerr, errBudget) || w.ctx.Err() != nil {
+				return rerr
 			}
-			if err != nil {
-				skip(Skipped{Path: name, Reason: err.Error(), Limit: errors.Is(err, errMember)})
+			if rerr != nil {
+				skip(Skipped{Path: name, Reason: rerr.Error(), Limit: errors.Is(rerr, errMember)})
 				continue
 			}
-			m = Member{Path: name, Size: int64(len(data)), R: bytesReaderAt(data), Release: rel}
 		}
 		if err := fn(m); err != nil {
 			return err
@@ -172,7 +200,7 @@ func overlapping(files []*zip.File) error {
 			continue
 		}
 		start := off - 30 - int64(len(f.Name)) // the local header, at least
-		spans = append(spans, span{max(start, 0), off + int64(f.CompressedSize64)})
+		spans = append(spans, span{max(start, 0), off + int64(min(f.CompressedSize64, math.MaxInt64/2))})
 	}
 	slices.SortFunc(spans, func(a, b span) int {
 		switch {
@@ -189,6 +217,21 @@ func overlapping(files []*zip.File) error {
 		}
 	}
 	return nil
+}
+
+// sparse reports whether a tar member is a sparse file, in any of the GNU
+// forms: its bytes in the archive are not its content, which has holes
+// the archive does not store.
+func sparse(h *tar.Header) bool {
+	if h.Typeflag == tar.TypeGNUSparse {
+		return true
+	}
+	for k := range h.PAXRecords {
+		if strings.HasPrefix(k, "GNU.sparse.") {
+			return true
+		}
+	}
+	return false
 }
 
 // walkTar reads a tar stream. inPlace says that src is the archive file
@@ -210,10 +253,14 @@ func (w *archiveWalker) walkTar(src io.Reader, inPlace bool, fn func(Member) err
 			}
 			return fmt.Errorf("gofast: tar: %v: %w", err, ErrArchive)
 		}
-		if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeRegA {
-			if h.Typeflag == tar.TypeGNUSparse {
-				skip(Skipped{Path: cleanName(h.Name), Reason: "a sparse file"})
+		if h.Typeflag == tar.TypeLink {
+			if name, ok := memberPath(h.Name); ok {
+				target, _ := memberPath(h.Linkname)
+				skip(Skipped{Path: name, Reason: fmt.Sprintf("a hard link to %s, which is read under that name", target), Note: true})
 			}
+			continue
+		}
+		if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeRegA && h.Typeflag != tar.TypeGNUSparse {
 			continue
 		}
 		name, ok := memberPath(h.Name)
@@ -221,31 +268,39 @@ func (w *archiveWalker) walkTar(src io.Reader, inPlace bool, fn func(Member) err
 			skip(Skipped{Path: cleanName(h.Name), Reason: "its name is not a path inside the archive"})
 			continue
 		}
+		if sparse(h) {
+			skip(Skipped{Path: name, Reason: "a sparse file, which is not read"})
+			continue
+		}
 		if h.Size < 0 {
 			skip(Skipped{Path: name, Reason: "damaged"})
 			continue
 		}
 		var m Member
-		if inPlace && sr != nil {
+		switch {
+		case w.counting:
+			m = Member{Path: name, Size: h.Size}
+		case inPlace && sr != nil:
 			off, err := sr.Seek(0, io.SeekCurrent)
 			if err != nil || h.Size > sr.Size()-off {
 				skip(Skipped{Path: name, Reason: "damaged"})
 				continue
 			}
 			m = Member{Path: name, Size: h.Size, R: io.NewSectionReader(sr, off, h.Size)}
-		} else {
+		default:
 			if h.Size > w.maxMember {
 				skip(Skipped{Path: name, Reason: fmt.Sprintf("larger than %d bytes decompressed", w.maxMember), Limit: true})
 				continue
 			}
-			data, rel, err := w.read(tr, h.Size, false)
-			if errors.Is(err, errBudget) {
-				return err
+			// The stream is taken from the bound as it is read.
+			var rerr error
+			m, rerr = w.read(name, tr, h.Size, h.Size, false)
+			if errors.Is(rerr, errBudget) || w.ctx.Err() != nil {
+				return rerr
 			}
-			if err != nil {
-				return fmt.Errorf("gofast: tar: %v: %w", err, ErrArchive)
+			if rerr != nil {
+				return fmt.Errorf("gofast: tar: %v: %w", rerr, ErrArchive)
 			}
-			m = Member{Path: name, Size: int64(len(data)), R: bytesReaderAt(data), Release: rel}
 		}
 		if err := fn(m); err != nil {
 			return err
@@ -262,15 +317,18 @@ func (w *archiveWalker) walkGzip(r io.ReaderAt, size int64, name string, fn func
 		return fmt.Errorf("gofast: gzip: %v: %w", err, ErrArchive)
 	}
 	defer zr.Close()
-	counted := &budgetReader{r: zr, w: w}
-	br := bufio.NewReaderSize(counted, 64<<10)
+	br := bufio.NewReaderSize(&budgetReader{r: zr, w: w}, 64<<10)
 	head, _ := br.Peek(262)
 	inner := innerName(name, zr.Header.Name)
 	if len(head) >= 262 && string(head[257:262]) == "ustar" || strings.HasSuffix(strings.ToLower(inner), ".tar") {
 		return w.walkTar(br, false, fn, skip)
 	}
-	data, rel, err := w.read(br, -1, false)
-	if errors.Is(err, errBudget) {
+	if w.counting {
+		return fn(Member{Path: inner})
+	}
+	// The stream says nothing of its size; deflate bounds it.
+	m, err := w.read(inner, br, -1, size*deflateRatio+1024, false)
+	if errors.Is(err, errBudget) || w.ctx.Err() != nil {
 		return err
 	}
 	if err != nil {
@@ -280,7 +338,7 @@ func (w *archiveWalker) walkGzip(r io.ReaderAt, size int64, name string, fn func
 		}
 		return fmt.Errorf("gofast: gzip: %v: %w", err, ErrArchive)
 	}
-	return fn(Member{Path: inner, Size: int64(len(data)), R: bytesReaderAt(data), Release: rel})
+	return fn(m)
 }
 
 // innerName is the name of the file a gzip file holds: the name its
@@ -309,41 +367,35 @@ var errMember = errors.New("larger than the bound on a member decompressed")
 
 // read reads a member into memory: at most w.maxMember bytes, taken from
 // the walk's decompression bound when budget is set (otherwise src
-// already takes them, as the stream of a gzip file does). declared is the
-// size the archive gives it, -1 if none. The function returned releases
-// what hold accounted.
-func (w *archiveWalker) read(src io.Reader, declared int64, budget bool) ([]byte, func(), error) {
-	want := w.maxMember
-	if declared >= 0 {
-		want = min(declared, w.maxMember)
-	}
+// already takes them, as the stream of a gzip file does). declared is
+// the size the archive gives it, -1 if none; most is the most it can
+// plausibly be, which is what is held in memory for it and set aside.
+func (w *archiveWalker) read(name string, src io.Reader, declared, most int64, budget bool) (Member, error) {
+	limit := min(w.maxMember, math.MaxInt64-1)
+	held := min(limit, max(most, 0))
 	release := func() {}
 	if w.hold != nil {
-		n := declared
-		if n < 0 {
-			n = w.maxMember // a gzip stream does not say
+		r, err := w.hold(held, w.own)
+		if err != nil {
+			return Member{}, err
 		}
-		release = w.hold(min(n, w.maxMember))
+		release = r
 	}
-	var buf []byte
-	if declared >= 0 {
-		buf = make([]byte, 0, declared)
-	}
+	buf := make([]byte, 0, min(held, 64<<20))
 	b := bytesWriter{buf: buf}
-	n, err := io.Copy(&b, io.LimitReader(&budgetReader{r: src, w: w, unbudgeted: !budget}, want+1))
+	n, err := io.Copy(&b, io.LimitReader(&budgetReader{r: src, w: w, unbudgeted: !budget}, limit+1))
+	switch {
+	case err != nil:
+	case n > limit:
+		err = fmt.Errorf("%w (%d bytes)", errMember, limit)
+	case declared >= 0 && n != declared:
+		err = errors.New("damaged: its size is not the size the archive gives")
+	}
 	if err != nil {
 		release()
-		return nil, nil, err
+		return Member{}, err
 	}
-	if n > w.maxMember {
-		release()
-		return nil, nil, fmt.Errorf("%w (%d bytes)", errMember, w.maxMember)
-	}
-	if declared >= 0 && n != declared {
-		release()
-		return nil, nil, errors.New("damaged: its size is not the size the archive gives")
-	}
-	return b.buf, release, nil
+	return Member{Path: name, Size: n, R: bytesReaderAt(b.buf), Release: release, held: held}, nil
 }
 
 // budgetReader takes what it reads from the walk's decompression bound,
@@ -412,7 +464,7 @@ func memberPath(name string) (string, bool) {
 // cleanName makes a name valid UTF-8 without control characters.
 func cleanName(s string) string {
 	if !utf8.ValidString(s) {
-		s = strings.ToValidUTF8(s, "\uFFFD")
+		s = strings.ToValidUTF8(s, string(utf8.RuneError))
 	}
 	return strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
@@ -428,10 +480,53 @@ type WalkOptions struct {
 	// 1 opens none. Zero means gofastcore.DefaultMaxDepth.
 	MaxDepth int
 	// Hold, when not nil, is called with the number of bytes a member
-	// will take in memory before they are read, and returns the function
-	// that gives them back (Member.Release). It may block, to bound the
-	// memory the members being read take together.
-	Hold func(n int64) (release func())
+	// will take in memory before they are read, and with own, the bytes
+	// the walk itself holds at the moment (the archives it is inside,
+	// which it cannot give back before it is out of them). It returns
+	// the function that gives the bytes back (part of Member.Release).
+	// It may wait, to bound the memory the members being read take
+	// together, but not for own; an error stops the walk.
+	Hold func(n, own int64) (release func(), err error)
+}
+
+// nest ties the bytes of an archive held in memory to its members: they
+// are given back when the walk is out of it and every member read in
+// place from them is released.
+type nest struct {
+	mu      sync.Mutex
+	n       int
+	release func()
+}
+
+func (r *nest) add() {
+	r.mu.Lock()
+	r.n++
+	r.mu.Unlock()
+}
+
+func (r *nest) done() {
+	r.mu.Lock()
+	r.n--
+	last := r.n == 0
+	r.mu.Unlock()
+	if last && r.release != nil {
+		r.release()
+	}
+}
+
+// wrap makes a member's release also release its share of the archive
+// it is in.
+func (r *nest) wrap(release func()) func() {
+	r.add()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			if release != nil {
+				release()
+			}
+			r.done()
+		})
+	}
 }
 
 // Walk calls fn for every file of the archive r (whose Kind is k, as
@@ -443,7 +538,8 @@ type WalkOptions struct {
 // walk. fn owns each Member: it calls Release, when set, once it no longer
 // needs the bytes, and may do so after Walk returns. An error from fn
 // stops the walk and is returned; an archive that cannot be read gives an
-// error wrapping ErrArchive, after the members before the damage.
+// error wrapping ErrArchive, after the members before the damage, and one
+// stopped by MaxArchiveBytes an error wrapping ErrLimit.
 func (e *Extractor) Walk(ctx context.Context, k Kind, name string, r io.ReaderAt, size int64, opts WalkOptions,
 	fn func(Member) error, skip func(Skipped)) error {
 	if !k.IsArchive() {
@@ -452,10 +548,13 @@ func (e *Extractor) Walk(ctx context.Context, k Kind, name string, r io.ReaderAt
 	w := &archiveWalker{ctx: ctx, maxMember: resolve(e.MaxMemberBytes, DefaultMaxMemberBytes),
 		left: resolve(e.MaxArchiveBytes, DefaultMaxArchiveBytes), hold: opts.Hold}
 	maxDepth := int(resolve(int64(opts.MaxDepth), 4))
-	var walk func(k Kind, name, prefix string, r io.ReaderAt, size int64, depth int) error
-	walk = func(k Kind, name, prefix string, r io.ReaderAt, size int64, depth int) error {
+	var walk func(k Kind, name, prefix string, r io.ReaderAt, size int64, depth int, parent *nest) error
+	walk = func(k Kind, name, prefix string, r io.ReaderAt, size int64, depth int, parent *nest) error {
 		err := w.walk(k.Format, r, size, name, func(m Member) error {
 			m.Path = prefix + m.Path
+			if parent != nil {
+				m.Release = parent.wrap(m.Release)
+			}
 			mk := Detect(m.Path, "", m.R, m.Size)
 			if !mk.IsArchive() {
 				return fn(m)
@@ -467,10 +566,11 @@ func (e *Extractor) Walk(ctx context.Context, k Kind, name string, r io.ReaderAt
 				skip(Skipped{Path: m.Path, Reason: fmt.Sprintf("an archive nested more than %d deep", maxDepth), Limit: true})
 				return nil
 			}
-			err := walk(mk, m.Path, m.Path+"/", m.R, m.Size, depth+1)
-			if m.Release != nil {
-				m.Release()
-			}
+			inner := &nest{n: 1, release: m.Release}
+			w.own += m.held
+			err := walk(mk, m.Path, m.Path+"/", m.R, m.Size, depth+1, inner)
+			w.own -= m.held
+			inner.done()
 			if errors.Is(err, ErrArchive) {
 				// A damaged archive inside: what was read of it stands.
 				skip(Skipped{Path: m.Path, Reason: err.Error()})
@@ -486,7 +586,7 @@ func (e *Extractor) Walk(ctx context.Context, k Kind, name string, r io.ReaderAt
 		}
 		return err
 	}
-	return walk(k, name, "", r, size, 0)
+	return walk(k, name, "", r, size, 0, nil)
 }
 
 // ErrLimit wraps a walk stopped by MaxArchiveBytes.
@@ -498,7 +598,7 @@ func resolve(v, def int64) int64 {
 	case v == 0:
 		return def
 	case v < 0:
-		return 1<<63 - 1
+		return math.MaxInt64
 	}
 	return v
 }

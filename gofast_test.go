@@ -8,8 +8,10 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	gofastcore "github.com/AOShei/go-fast-core"
 )
@@ -224,12 +226,12 @@ func TestWalkOverlap(t *testing.T) {
 
 func TestHold(t *testing.T) {
 	held, max := int64(0), int64(0)
-	hold := func(n int64) func() {
+	hold := func(n, own int64) (func(), error) {
 		held += n
 		if held > max {
 			max = held
 		}
-		return func() { held -= n }
+		return func() { held -= n }, nil
 	}
 	b := zipOf(t, file{name: "a.txt", body: strings.Repeat("a", 100)}, file{name: "b.txt", body: strings.Repeat("b", 200)})
 	if _, _, err := walkAll(t, &Extractor{}, Kind{LibArchive, "zip"}, "h.zip", b, WalkOptions{Hold: hold}); err != nil {
@@ -237,6 +239,212 @@ func TestHold(t *testing.T) {
 	}
 	if held != 0 || max != 200 {
 		t.Errorf("held %d, max %d", held, max)
+	}
+}
+
+// TestHoldNested: the bytes of an archive inside an archive stay held
+// until the members read in place from them are released, and the walk
+// tells Hold what it holds itself, so that a bound smaller than the
+// archives it is inside does not make it wait for ever.
+func TestHoldNested(t *testing.T) {
+	inner := zipOf(t, file{name: "big.txt", body: strings.Repeat("x", 1<<16), store: true})
+	outer := zipOf(t, file{name: "inner.zip", body: string(inner)}, file{name: "n.txt.gz", body: string(gz([]byte("gz"), ""))})
+	held := int64(0)
+	var owns []int64
+	hold := func(n, own int64) (func(), error) {
+		owns = append(owns, own)
+		held += n
+		return func() { held -= n }, nil
+	}
+	var pending []Member
+	err := (&Extractor{}).Walk(context.Background(), Kind{LibArchive, "zip"}, "o.zip", bytes.NewReader(outer), int64(len(outer)),
+		WalkOptions{Hold: hold}, func(m Member) error { pending = append(pending, m); return nil }, func(s Skipped) { t.Errorf("skipped %+v", s) })
+	if err != nil || len(pending) != 2 || pending[0].Path != "inner.zip/big.txt" || pending[1].Path != "n.txt.gz/n.txt" {
+		t.Fatalf("%v %+v", err, pending)
+	}
+	if held < int64(len(inner)) {
+		t.Errorf("inner.zip given back while its member is unread: held %d", held)
+	}
+	for _, m := range pending {
+		m.Release()
+	}
+	if held != 0 {
+		t.Errorf("held %d after all released", held)
+	}
+	// Holding n.txt.gz's member, the walk is inside n.txt.gz.
+	if len(owns) != 3 || owns[0] != 0 || owns[2] == 0 {
+		t.Errorf("own: %v", owns)
+	}
+}
+
+// paxSparse is a tar archive of a GNU 1.0 sparse member "s" (its PAX
+// records written by hand, as Go's tar writer does not write them) and a
+// regular "next.txt".
+func paxSparse(t *testing.T) []byte {
+	t.Helper()
+	records := ""
+	for _, kv := range [][2]string{{"GNU.sparse.major", "1"}, {"GNU.sparse.minor", "0"}, {"GNU.sparse.name", "s"}, {"GNU.sparse.realsize", "100000000"}} {
+		rec := " " + kv[0] + "=" + kv[1] + "\n"
+		n := len(rec) + 2
+		if len(fmt.Sprint(n)+rec) != n {
+			n++
+		}
+		records += fmt.Sprint(n) + rec
+	}
+	block := func(name string, size int, flag byte) []byte {
+		var b bytes.Buffer
+		w := tar.NewWriter(&b)
+		w.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Size: int64(size), Format: tar.FormatUSTAR})
+		h := append([]byte{}, b.Bytes()[:512]...)
+		h[156] = flag
+		copy(h[148:156], "        ")
+		sum := 0
+		for _, c := range h {
+			sum += int(c)
+		}
+		copy(h[148:156], fmt.Sprintf("%06o\x00 ", sum))
+		return h
+	}
+	pad := func(b []byte) []byte { return append(b, make([]byte, (512-len(b)%512)%512)...) }
+	data := "1\n0\n3\n" + strings.Repeat("\x00", 512-6) + "abc"
+	var out []byte
+	out = append(out, block("PaxHeaders/s", len(records), 'x')...)
+	out = append(out, pad([]byte(records))...)
+	out = append(out, block("s", len(data), '0')...)
+	out = append(out, pad([]byte(data))...)
+	out = append(out, block("next.txt", 4, '0')...)
+	out = append(out, pad([]byte("next"))...)
+	return append(out, make([]byte, 1024)...)
+}
+
+// TestSparse: a sparse tar member is skipped, neither read raw in place
+// nor expanded past the bound.
+func TestSparse(t *testing.T) {
+	for _, k := range []Kind{{LibArchive, "tar"}, {LibArchive, "gzip"}} {
+		in := paxSparse(t)
+		if k.Format == "gzip" {
+			in = gz(in, "")
+		}
+		got, skipped, err := walkAll(t, &Extractor{MaxArchiveBytes: 1 << 20}, k, "s.tar", in, WalkOptions{})
+		if err != nil || strings.Join(got, ",") != "next.txt=next" || len(skipped) != 1 || skipped[0].Path != "s" {
+			t.Errorf("%s: %.80q %+v %v", k.Format, got, skipped, err)
+		}
+	}
+}
+
+func TestHardLink(t *testing.T) {
+	var b bytes.Buffer
+	w := tar.NewWriter(&b)
+	w.WriteHeader(&tar.Header{Name: "a.txt", Typeflag: tar.TypeReg, Size: 1})
+	w.Write([]byte("a"))
+	w.WriteHeader(&tar.Header{Name: "b.txt", Typeflag: tar.TypeLink, Linkname: "a.txt"})
+	w.Close()
+	got, skipped, err := walkAll(t, &Extractor{}, Kind{LibArchive, "tar"}, "h.tar", b.Bytes(), WalkOptions{})
+	if err != nil || strings.Join(got, ",") != "a.txt=a" || len(skipped) != 1 || !skipped[0].Note || skipped[0].Path != "b.txt" {
+		t.Errorf("%q %+v %v", got, skipped, err)
+	}
+}
+
+// TestNoMemberBound: with no bound on a member, a gzip member is read
+// whole, not cut to nothing.
+func TestNoMemberBound(t *testing.T) {
+	got, _, err := walkAll(t, &Extractor{MaxMemberBytes: -1}, Kind{LibArchive, "gzip"}, "n.txt.gz", gz([]byte("notes"), ""), WalkOptions{})
+	if err != nil || strings.Join(got, ",") != "n.txt=notes" {
+		t.Errorf("%q %v", got, err)
+	}
+}
+
+// TestLyingSize: a zip member that says it is far larger than its
+// compressed bytes allow is skipped at once, without setting memory
+// aside for what it says.
+func TestLyingSize(t *testing.T) {
+	var files []file
+	for i := range 300 {
+		files = append(files, file{name: fmt.Sprintf("m%03d.txt", i), body: "x"})
+	}
+	b := zipOf(t, files...)
+	// Each central directory and local header says 1 GiB uncompressed.
+	for off := 0; ; {
+		i := bytes.Index(b[off:], []byte("PK\x01\x02"))
+		if i < 0 {
+			break
+		}
+		binary.LittleEndian.PutUint32(b[off+i+24:], 1<<30)
+		off += i + 4
+	}
+	for off := 0; ; {
+		i := bytes.Index(b[off:], []byte("PK\x03\x04"))
+		if i < 0 {
+			break
+		}
+		binary.LittleEndian.PutUint32(b[off+i+22:], 1<<30)
+		off += i + 4
+	}
+	start := time.Now()
+	got, skipped, err := walkAll(t, &Extractor{}, Kind{LibArchive, "zip"}, "l.zip", b, WalkOptions{})
+	if err != nil || len(got) != 0 || len(skipped) != 300 || !strings.Contains(skipped[0].Reason, "compressed size allows") {
+		t.Errorf("%d %d %v %+v", len(got), len(skipped), err, skipped[:1])
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		t.Errorf("took %v", d)
+	}
+}
+
+// TestDecodeSettled: an archive's children take from the decode budget
+// what the walk left, so nested archives do not multiply it; members
+// past MaxArchiveMembers are not decompressed.
+func TestDecodeSettled(t *testing.T) {
+	inner := zipOf(t, file{name: "b.txt", body: strings.Repeat("b", 600_000)})
+	outer := zipOf(t, file{name: "a.txt", body: strings.Repeat("a", 600_000)}, file{name: "inner.zip", body: string(inner)})
+	e := &Extractor{}
+	doc, err := e.Extract(context.Background(), bytes.NewReader(outer), int64(len(outer)),
+		&gofastcore.Options{Name: "o.zip", Limits: gofastcore.Limits{MaxDecodedBytes: 1 << 20}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	limited := false
+	var walk func(d *gofastcore.Document)
+	walk = func(d *gofastcore.Document) {
+		for _, w := range d.AllWarnings() {
+			limited = limited || w.Code == gofastcore.WarnLimitExceeded
+		}
+		for _, c := range d.Children {
+			walk(c)
+		}
+	}
+	walk(doc)
+	if !limited {
+		t.Error("1.2 MB decompressed under a 1 MiB budget, with no warning")
+	}
+	two := zipOf(t, file{name: "a.txt", body: "a"}, file{name: "b.txt", body: strings.Repeat("b", 100_000)})
+	doc, err = (&Extractor{MaxArchiveMembers: 1}).Extract(context.Background(), bytes.NewReader(two), int64(len(two)),
+		&gofastcore.Options{Name: "t.zip", Limits: gofastcore.Limits{MaxDecodedBytes: 1000}})
+	if err != nil || len(doc.Warnings) != 1 || doc.Warnings[0].Message != "members past 1 were not read (1 members)" {
+		t.Errorf("%v %+v", err, doc.Warnings)
+	}
+}
+
+func TestDetectGeneric(t *testing.T) {
+	docx := zipOf(t, file{name: "[Content_Types].xml", body: "<Types/>"})
+	pdf := []byte("%PDF-1.7\n")
+	for _, c := range []struct {
+		name, mime string
+		body       []byte
+		want       Kind
+	}{
+		{"report.docx", "application/zip", docx, Kind{LibOOXML, ""}},
+		{"noext", "application/x-zip-compressed", docx, Kind{LibOOXML, ""}},
+		{"a.pdf", "text/plain", pdf, Kind{LibPDF, ""}},
+		{"", "text/plain; charset=utf-8", []byte("<html><p>x"), Kind{LibHTML, "txt"}},
+		{"README", "", []byte("From the desk of the editor, 2024\nhello"), Kind{LibHTML, "txt"}},
+		{"notes", "", []byte("Date: 2024-01-01\nAuthor: me\n\nnotes"), Kind{LibHTML, "txt"}},
+		{"front", "", []byte("title: x\ndate: 2024\n"), Kind{LibHTML, "txt"}},
+		{"log", "", []byte("printing %PDF- header check\n"), Kind{LibHTML, "txt"}},
+		{"m", "", []byte("From: a@b\nTo: c@d\nSubject: s\n\nbody"), Kind{LibEmail, ""}},
+	} {
+		if got := Detect(c.name, c.mime, bytes.NewReader(c.body), int64(len(c.body))); got != c.want {
+			t.Errorf("Detect(%q, %q) = %+v, want %+v", c.name, c.mime, got, c.want)
+		}
 	}
 }
 

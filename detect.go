@@ -110,16 +110,21 @@ var byMIME = map[string]Kind{
 const sniffBytes = 4096
 
 // Detect decides where an input goes. A declared media type (mimeType,
-// as a Content-Type gives it; empty or application/octet-stream when
-// none) decides first, then the extension of name, then the bytes:
+// as a Content-Type gives it) decides first, unless it is one mail
+// programs give whatever the file (application/octet-stream,
+// application/zip, text/plain); then the extension of name; then, but
+// for text/plain, which is text, the bytes:
 //
-//   - "%PDF-" in the first 1 KiB is PDF;
+//   - "%PDF-1." or "%PDF-2." in the first 1 KiB is PDF;
 //   - a zip archive is Office if it has [Content_Types].xml,
 //     OpenDocument or EPUB if its mimetype member says so, and otherwise
 //     an archive;
 //   - gzip and tar (ustar) are archives;
 //   - "{\rtf" is RTF; an OLE compound file, a TNEF stream, a mailbox's
-//     "From " line or a message's header lines are email;
+//     "From " line (an address, then a date with a time) or a message's
+//     header lines (at least two of the headers messages have, one of
+//     them From, Received, Return-Path, Message-ID, MIME-Version or
+//     Delivered-To) are email;
 //   - an OpenDocument flat XML file is OpenDocument;
 //   - binary input (a NUL byte, or many control characters, in the first
 //     4 KiB: images, audio, executables) gives the zero Kind;
@@ -129,10 +134,9 @@ const sniffBytes = 4096
 // A name whose extension is an Office 97-2003 format (.doc, .xls, .ppt and
 // their templates) gives the zero Kind: no library reads those yet.
 func Detect(name, mimeType string, r io.ReaderAt, size int64) Kind {
-	if t := mediaType(mimeType); t != "" && t != "application/octet-stream" {
-		if k, ok := byMIME[t]; ok {
-			return k
-		}
+	t := mediaType(mimeType)
+	if k, ok := byMIME[t]; ok && !generic[t] {
+		return k
 	}
 	ext := strings.ToLower(path.Ext(name))
 	if strings.HasSuffix(strings.ToLower(name), ".tar.gz") {
@@ -147,7 +151,18 @@ func Detect(name, mimeType string, r io.ReaderAt, size int64) Kind {
 	if strings.EqualFold(path.Base(name), "winmail.dat") {
 		return Kind{LibEmail, ""}
 	}
+	if t == "text/plain" {
+		// Declared text with no extension saying otherwise is text.
+		return Kind{LibHTML, "txt"}
+	}
 	return sniff(name, r, size)
+}
+
+// generic are the media types a mail program gives files it does not
+// know better: a .docx or an .epub sent as application/zip, a .pdf as
+// text/plain. A known extension, or the bytes, decide over them.
+var generic = map[string]bool{
+	"application/octet-stream": true, "application/zip": true, "application/x-zip-compressed": true, "text/plain": true,
 }
 
 // legacyOffice are the extensions of the Office 97-2003 formats.
@@ -175,7 +190,7 @@ func sniff(name string, r io.ReaderAt, size int64) Kind {
 	n, _ := r.ReadAt(head, 0)
 	head = head[:n]
 	switch {
-	case bytes.Contains(head[:min(len(head), 1024)], []byte("%PDF-")):
+	case bytes.Contains(head[:min(len(head), 1024)], []byte("%PDF-1.")) || bytes.Contains(head[:min(len(head), 1024)], []byte("%PDF-2.")):
 		return Kind{LibPDF, ""}
 	case bytes.HasPrefix(head, []byte("PK\x03\x04")) || bytes.HasPrefix(head, []byte("PK\x05\x06")):
 		return sniffZip(r, size)
@@ -191,7 +206,7 @@ func sniff(name string, r io.ReaderAt, size int64) Kind {
 		return Kind{LibEmail, ""}
 	case bytes.HasPrefix(head, []byte{0x78, 0x9f, 0x3e, 0x22}): // TNEF
 		return Kind{LibEmail, ""}
-	case bytes.HasPrefix(head, []byte("From ")):
+	case mboxLine(head):
 		return Kind{LibEmail, ""}
 	case messageHeaders(head):
 		return Kind{LibEmail, ""}
@@ -256,22 +271,22 @@ func sniffZip(r io.ReaderAt, size int64) Kind {
 }
 
 // messageHeaders reports whether an input begins with the header lines of
-// a message: at least two lines "Name: value", one of them a header every
-// message or mail program writes.
+// a message: only lines "Name: value" (and folded lines) up to the blank
+// line, at least two of them headers messages have, one of those a
+// header only mail carries.
 func messageHeaders(head []byte) bool {
-	known := 0
-	lines := 0
-	for len(head) > 0 && lines < 8 {
-		line, rest, ok := bytes.Cut(head, []byte("\n"))
-		if !ok {
-			break
-		}
+	known, strong, lines := 0, 0, 0
+	for len(head) > 0 && lines < 32 {
+		line, rest, _ := bytes.Cut(head, []byte("\n"))
 		head = rest
 		line = bytes.TrimRight(line, "\r")
 		if len(line) == 0 {
 			break
 		}
 		if line[0] == ' ' || line[0] == '\t' {
+			if lines == 0 {
+				return false
+			}
 			continue // a folded line
 		}
 		name, _, ok := bytes.Cut(line, []byte(":"))
@@ -280,11 +295,35 @@ func messageHeaders(head []byte) bool {
 		}
 		lines++
 		switch strings.ToLower(string(name)) {
-		case "received", "return-path", "from", "to", "subject", "date", "message-id", "mime-version", "delivered-to":
+		case "received", "return-path", "from", "message-id", "mime-version", "delivered-to":
+			known++
+			strong++
+		case "to", "subject", "date", "cc", "reply-to", "content-type", "sender", "x-mailer", "in-reply-to", "references":
 			known++
 		}
 	}
-	return lines >= 2 && known >= 1
+	return known >= 2 && strong >= 1
+}
+
+// mboxLine reports whether an input begins with a mailbox's separator
+// line: "From ", an address, then a date with a time ("From a@b Mon Jan  1
+// 00:00:00 2024").
+func mboxLine(head []byte) bool {
+	line, _, _ := bytes.Cut(head, []byte("\n"))
+	rest, ok := bytes.CutPrefix(line, []byte("From "))
+	if !ok {
+		return false
+	}
+	fields := bytes.Fields(rest)
+	if len(fields) < 3 {
+		return false
+	}
+	for _, f := range fields[1:] {
+		if len(f) == 8 && f[2] == ':' && f[5] == ':' {
+			return true
+		}
+	}
+	return false
 }
 
 // mediaType is the media type of a Content-Type value, lowercase and

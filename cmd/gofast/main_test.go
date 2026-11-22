@@ -1,9 +1,11 @@
 package main
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	gofastcore "github.com/AOShei/go-fast-core"
 )
@@ -190,5 +193,80 @@ func TestOutputFile(t *testing.T) {
 	got, _ := os.ReadFile(o)
 	if status != 0 || stdout != "" || !strings.Contains(string(got), "==> "+a+" <==\nalpha") || !strings.Contains(string(got), "==> "+b+" <==\nbeta") {
 		t.Errorf("%d %q", status, got)
+	}
+}
+
+// TestNoHang: a gzip member inside a zip, with a memory bound smaller
+// than the zip and the member together, is read (the walk does not wait
+// for memory it holds itself); a cancelled run ends.
+func TestNoHang(t *testing.T) {
+	dir := t.TempDir()
+	var gzb bytes.Buffer
+	zw := gzip.NewWriter(&gzb)
+	zw.Write([]byte(strings.Repeat("notes ", 2000)))
+	zw.Close()
+	p := filepath.Join(dir, "gzinzip.zip")
+	writeZip(t, p, [2]string{"notes.txt.gz", gzb.String()})
+	done := make(chan int, 1)
+	var out string
+	go func() {
+		o, _, status := runCmd(t, "", "-quiet", "-max-memory-bytes", "1000", "-max-member-bytes", "5368709120", p)
+		out = o
+		done <- status
+	}()
+	select {
+	case status := <-done:
+		if status != 0 || len(docs(t, out)) != 1 {
+			t.Errorf("status %d: %.100q", status, out)
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("the run did not end")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var o, e bytes.Buffer
+	if status := run(ctx, []string{p}, strings.NewReader(""), &o, &e); status != 1 {
+		t.Errorf("cancelled run: status %d", status)
+	}
+}
+
+func TestDirRootAndDevices(t *testing.T) {
+	if filepath.Separator == '/' {
+		if p, err := outputPath("/", "a.pdf", ".json"); err != nil || p != "/a.pdf.json" {
+			t.Errorf("-dir /: %q %v", p, err)
+		}
+	}
+	dir := t.TempDir()
+	for rel, want := range map[string]string{"CON.txt": "_CON.txt.json", "x./nul": "x_/_nul.json", "lpt1": "_lpt1.json", "a. ": "a_.json", "COM10": "COM10.json"} {
+		p, err := outputPath(dir, rel, ".json")
+		got, _ := filepath.Rel(dir, p)
+		if err != nil || filepath.ToSlash(got) != want {
+			t.Errorf("outputPath(%q) = %q %v, want %q", rel, got, err, want)
+		}
+	}
+}
+
+// TestHardLinkNote: a tar hard link is a note, not a failure.
+func TestHardLinkNote(t *testing.T) {
+	dir := t.TempDir()
+	var b bytes.Buffer
+	w := tar.NewWriter(&b)
+	w.WriteHeader(&tar.Header{Name: "a.txt", Typeflag: tar.TypeReg, Size: 1})
+	w.Write([]byte("a"))
+	w.WriteHeader(&tar.Header{Name: "b.txt", Typeflag: tar.TypeLink, Linkname: "a.txt"})
+	w.Close()
+	p := filepath.Join(dir, "h.tar")
+	os.WriteFile(p, b.Bytes(), 0o644)
+	out, errs, status := runCmd(t, "", p)
+	if status != 0 || len(docs(t, out)) != 1 || !strings.Contains(errs, "h.tar/b.txt: a hard link to a.txt") {
+		t.Errorf("status %d\n%s", status, errs)
+	}
+}
+
+func TestStdinBound(t *testing.T) {
+	_, errs, status := runCmd(t, strings.Repeat("x", 2000), "-max-input-bytes", "1000", "-")
+	if status != 1 || !strings.Contains(errs, "larger than 1000 bytes") {
+		t.Errorf("status %d: %s", status, errs)
 	}
 }

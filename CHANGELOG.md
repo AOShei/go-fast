@@ -18,8 +18,10 @@ and archives.
 - **Bounds on archives**: one member decompressed (1 GiB), all that is
   decompressed from an archive (64 GiB), members held in memory at once
   by all workers (4 GiB), members of an archive read as one document
-  (10,000). Overlapping zip members (zip bombs) are refused; member names
-  are cleaned, and `-dir` writes nothing outside its directory.
+  (10,000). Overlapping zip members (zip bombs), sparse tar members and
+  zip members larger than their compressed size allows are not read;
+  member names are cleaned, and `-dir` writes nothing outside its
+  directory, with names every system can create.
 - Pins: go-fast-core v0.1.1, go-fast-pdf v0.2.1, go-fast-ooxml v0.1.1,
   go-fast-odf v0.1.3, go-fast-rtf v0.1.2, go-fast-email v0.1.3,
   go-fast-html v0.2.0.
@@ -27,4 +29,8 @@ and archives.
   documents as the files read on their own (449 files of every format);
   2,699 corpus files read with no Validate error; tests for detection,
   archives, bounds, order, `-dir` and failures; `FuzzArchive`,
-  `FuzzDetect`; CI on Linux, macOS and Windows, Go 1.25 and stable.
+  `FuzzDetect`; CI on Linux, macOS and Windows, Go 1.25 and stable. An
+  independent review's fourteen findings (among them a hang when a
+  memory bound was smaller than nested archives, nested members not
+  counted against memory, sparse tar members, a decode budget not
+  settled before children) are fixed, with a test for each.

@@ -36,6 +36,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"os/signal"
 	"path"
@@ -54,7 +55,8 @@ import (
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
+	// After the first interrupt, the next one ends the process at once.
+	context.AfterFunc(ctx, stop)
 	os.Exit(run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
@@ -70,6 +72,7 @@ type config struct {
 	extractor *gofast.Extractor
 	maxDepth  int
 	maxMemory int64
+	maxInput  int64 // bytes of standard input or a pipe read into memory
 }
 
 // run is the command: it reads args and writes documents to stdout and
@@ -130,7 +133,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return fail("-j wants at least 1")
 	}
 	c := &config{format: *format, output: *output, dir: *dir, jobs: *jobs, quiet: *quiet, maxDepth: *maxDepth,
-		maxMemory: *maxMemory,
+		maxMemory: *maxMemory, maxInput: *maxInput,
 		extractor: &gofast.Extractor{MaxMemberBytes: *maxMember, MaxArchiveBytes: *maxArchive}}
 	if c.maxMemory == 0 {
 		c.maxMemory = 4 << 30
@@ -231,6 +234,7 @@ type task struct {
 	size    int64
 	done    func() // when the task is finished with r
 	err     error  // the task is this error, reported in its place
+	note    string // the task is this note, reported in its place
 }
 
 // result is a task read.
@@ -258,7 +262,7 @@ func (c *config) process(ctx context.Context, inputs []input, stdin io.Reader, s
 	window := make(chan struct{}, 4*c.jobs) // tasks between the producer and the writer
 	tasks := make(chan task)
 	results := make(chan result, c.jobs)
-	mem := newMemory(c.maxMemory)
+	mem := newMemory(ctx, c.maxMemory)
 
 	go c.produce(ctx, inputs, stdin, tasks, window, mem)
 
@@ -355,7 +359,7 @@ func (c *config) produce(ctx context.Context, inputs []input, stdin io.Reader, t
 		if ctx.Err() != nil {
 			return
 		}
-		r, size, closeFn, err := open(in, stdin)
+		r, size, closeFn, err := open(in, stdin, c.maxInput)
 		if err != nil {
 			if !send(task{display: in.path, err: err}) {
 				return
@@ -393,7 +397,11 @@ func (c *config) produce(ctx context.Context, inputs []input, stdin io.Reader, t
 				return nil
 			},
 			func(s gofast.Skipped) {
-				send(task{display: in.path + "/" + s.Path, err: errors.New("not read: " + s.Reason)})
+				t := task{display: in.path + "/" + s.Path, err: errors.New("not read: " + s.Reason)}
+				if s.Note {
+					t.err, t.note = nil, s.Reason
+				}
+				send(t)
 			})
 		refs.done()
 		if err != nil && ctx.Err() == nil {
@@ -404,15 +412,29 @@ func (c *config) produce(ctx context.Context, inputs []input, stdin io.Reader, t
 	}
 }
 
-// open opens an input for reading at any offset: a file, or standard
-// input read into memory.
-func open(in input, stdin io.Reader) (io.ReaderAt, int64, func(), error) {
-	if in.std {
-		b, err := io.ReadAll(stdin)
+// open opens an input for reading at any offset: a regular file in
+// place; standard input, a pipe or a device read into memory, up to
+// maxInput bytes (0: 1 GiB; negative: no bound).
+func open(in input, stdin io.Reader, maxInput int64) (io.ReaderAt, int64, func(), error) {
+	limit := maxInput
+	switch {
+	case limit == 0:
+		limit = 1 << 30
+	case limit < 0:
+		limit = math.MaxInt64 - 1
+	}
+	readAll := func(r io.Reader) (io.ReaderAt, int64, func(), error) {
+		b, err := io.ReadAll(io.LimitReader(r, limit+1))
 		if err != nil {
 			return nil, 0, nil, err
 		}
+		if int64(len(b)) > limit {
+			return nil, 0, nil, fmt.Errorf("larger than %d bytes, the bound on input read into memory (-max-input-bytes)", limit)
+		}
 		return bytesAt(b), int64(len(b)), func() {}, nil
+	}
+	if in.std {
+		return readAll(stdin)
 	}
 	f, err := os.Open(in.path)
 	if err != nil {
@@ -423,6 +445,10 @@ func open(in input, stdin io.Reader) (io.ReaderAt, int64, func(), error) {
 		f.Close()
 		return nil, 0, nil, err
 	}
+	if !st.Mode().IsRegular() {
+		defer f.Close()
+		return readAll(f)
+	}
 	return f, st.Size(), func() { f.Close() }, nil
 }
 
@@ -432,7 +458,7 @@ func (c *config) extract(ctx context.Context, t task) (res result) {
 	if t.done != nil {
 		defer t.done()
 	}
-	if t.err != nil {
+	if t.err != nil || t.note != "" {
 		return res
 	}
 	defer func() {
@@ -463,27 +489,41 @@ func (r *refCount) done() {
 
 // memory bounds the bytes of decompressed members held at once.
 type memory struct {
+	ctx  context.Context
 	mu   sync.Mutex
 	cond *sync.Cond
 	used int64
 	cap  int64
 }
 
-func newMemory(limit int64) *memory {
-	m := &memory{cap: limit}
+func newMemory(ctx context.Context, limit int64) *memory {
+	m := &memory{ctx: ctx, cap: limit}
 	m.cond = sync.NewCond(&m.mu)
+	// A cancelled run wakes whoever waits.
+	context.AfterFunc(ctx, func() {
+		m.mu.Lock()
+		m.cond.Broadcast()
+		m.mu.Unlock()
+	})
 	return m
 }
 
-// hold waits until n bytes fit (or nothing else is held), takes them, and
-// returns the function that gives them back.
-func (m *memory) hold(n int64) func() {
+// hold waits until n bytes fit beside what others hold (own is what the
+// caller itself holds, which it cannot give back while it waits), takes
+// them, and returns the function that gives them back. It gives up when
+// the run is cancelled.
+func (m *memory) hold(n, own int64) (func(), error) {
 	if m.cap < 0 {
-		return func() {}
+		return func() {}, nil
 	}
+	n = min(n, m.cap) // a larger member is read alone
 	m.mu.Lock()
-	for m.used > 0 && m.used+n > m.cap {
+	for m.used-own > 0 && m.used+n > m.cap && m.ctx.Err() == nil {
 		m.cond.Wait()
+	}
+	if err := m.ctx.Err(); err != nil {
+		m.mu.Unlock()
+		return nil, err
 	}
 	m.used += n
 	m.mu.Unlock()
@@ -492,10 +532,10 @@ func (m *memory) hold(n int64) func() {
 		once.Do(func() {
 			m.mu.Lock()
 			m.used -= n
-			m.mu.Unlock()
 			m.cond.Broadcast()
+			m.mu.Unlock()
 		})
-	}
+	}, nil
 }
 
 // writer writes documents in order.
@@ -535,6 +575,12 @@ func newWriter(c *config, stdout, stderr io.Writer, single bool) *writer {
 func (w *writer) write(r result) {
 	if r.err == nil && r.task.err != nil {
 		r.err = r.task.err
+	}
+	if r.note != "" {
+		if !w.c.quiet {
+			fmt.Fprintf(w.stderr, "%s: %s\n", r.display, r.note)
+		}
+		return
 	}
 	if r.err != nil {
 		if !errors.Is(r.err, context.Canceled) {
@@ -612,10 +658,12 @@ func (w *writer) writeFile(r result) error {
 	if err != nil {
 		return err
 	}
-	if w.paths[p] {
+	// Names that differ only in case are one file on Windows and macOS.
+	key := strings.ToLower(p)
+	if w.paths[key] {
 		return fmt.Errorf("another input was already written to %s", p)
 	}
-	w.paths[p] = true
+	w.paths[key] = true
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
@@ -635,7 +683,9 @@ func (w *writer) writeFile(r result) error {
 }
 
 // outputPath is the file a document whose path under -dir is rel is
-// written to: inside dir whatever rel says.
+// written to: inside dir whatever rel says, with names every system can
+// create (no characters Windows forbids, no trailing dot or space, no
+// device name such as CON or NUL).
 func outputPath(dir, rel, ext string) (string, error) {
 	var parts []string
 	for _, el := range strings.Split(filepath.ToSlash(rel), "/") {
@@ -651,6 +701,12 @@ func outputPath(dir, rel, ext string) (string, error) {
 			}
 			return r
 		}, el)
+		if t := strings.TrimRight(el, ". "); t != el {
+			el = t + "_"
+		}
+		if reserved(el) {
+			el = "_" + el
+		}
 		parts = append(parts, el)
 	}
 	if len(parts) == 0 {
@@ -665,10 +721,21 @@ func outputPath(dir, rel, ext string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !strings.HasPrefix(absP, absDir+string(filepath.Separator)) {
+	if r, err := filepath.Rel(absDir, absP); err != nil || r == ".." || strings.HasPrefix(r, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("%s is outside %s", path.Clean(rel), dir)
 	}
 	return p, nil
+}
+
+// reserved reports whether a name is a Windows device name, with or
+// without an extension.
+func reserved(name string) bool {
+	base, _, _ := strings.Cut(strings.ToUpper(name), ".")
+	switch base {
+	case "CON", "PRN", "AUX", "NUL":
+		return true
+	}
+	return len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '1' && base[3] <= '9'
 }
 
 // close flushes and closes the output; it may be called more than once.
