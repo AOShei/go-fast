@@ -1,0 +1,5 @@
+go-fast
+Copyright (c) 2025 Andrew O'Shei. MIT License (see LICENSE).
+
+This module contains no code taken from elsewhere. It requires the go-fast
+libraries, each under its own licence and NOTICE.
