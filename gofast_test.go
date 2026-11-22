@@ -536,3 +536,93 @@ func FuzzDetect(f *testing.F) {
 		}
 	})
 }
+
+// TestCancelDuringRead: a walk cancelled while a member is read ends with
+// the context's error and gives back what it held.
+func TestCancelDuringRead(t *testing.T) {
+	inputs := map[string][]byte{
+		"zip": zipOf(t, file{name: "a.txt", body: "aaaa"}, file{name: "b.txt", body: "b"}),
+		"tgz": gz(tarOf(t, file{name: "a.txt", body: "aaaa"}, file{name: "b.txt", body: "b"}), ""),
+		"gz":  gz([]byte(strings.Repeat("x", 30000)), ""),
+	}
+	for name, b := range inputs {
+		ctx, cancel := context.WithCancel(context.Background())
+		held := int64(0)
+		hold := func(n, own int64) (func(), error) {
+			held += n
+			cancel()
+			return func() { held -= n }, nil
+		}
+		k := Kind{LibArchive, "zip"}
+		if name != "zip" {
+			k.Format = "gzip"
+		}
+		var got []string
+		err := (&Extractor{}).Walk(ctx, k, "x."+name, bytes.NewReader(b), int64(len(b)), WalkOptions{Hold: hold},
+			func(m Member) error { got = append(got, m.Path); m.Release(); return nil }, func(Skipped) {})
+		if !errors.Is(err, context.Canceled) || held != 0 {
+			t.Errorf("%s: err %v, members %q, held %d", name, err, got, held)
+		}
+	}
+}
+
+// TestHoldError: an error from Hold stops the walk.
+func TestHoldError(t *testing.T) {
+	quota := errors.New("quota exceeded")
+	b := zipOf(t, file{name: "a.txt", body: "a"}, file{name: "b.txt", body: "b"})
+	err := (&Extractor{}).Walk(context.Background(), Kind{LibArchive, "zip"}, "q.zip", bytes.NewReader(b), int64(len(b)),
+		WalkOptions{Hold: func(n, own int64) (func(), error) { return nil, quota }},
+		func(m Member) error { t.Errorf("member %s", m.Path); return nil }, func(s Skipped) { t.Errorf("skipped %+v", s) })
+	if !errors.Is(err, quota) {
+		t.Errorf("%v", err)
+	}
+}
+
+// TestLongHeaders: a message whose header block is longer than what is
+// sniffed is still email.
+func TestLongHeaders(t *testing.T) {
+	var h strings.Builder
+	h.WriteString("Delivered-To: a@example.com\r\n")
+	for i := range 6 {
+		fmt.Fprintf(&h, "Received: from mx%d.example.com\r\n        by relay.example.com; Mon, 1 Jan 2024 00:00:00 +0000\r\n", i)
+	}
+	h.WriteString("ARC-Seal: i=1; a=rsa-sha256;")
+	for h.Len() < sniffBytes-20 {
+		h.WriteString("\r\n        b=abcdefghijklmnopqrstuvwxyz0123456789")
+	}
+	for h.Len() < sniffBytes-5 {
+		h.WriteString("x")
+	}
+	h.WriteString("\r\nContent-Type: text/plain\r\n\r\nbody")
+	b := []byte(h.String())
+	if k := Detect("", "", bytes.NewReader(b), int64(len(b))); k != (Kind{LibEmail, ""}) {
+		t.Errorf("%+v", k)
+	}
+}
+
+// TestOtherMethod: a zip member compressed with a method Go does not
+// decode is reported as such, whatever its size says.
+func TestOtherMethod(t *testing.T) {
+	var b bytes.Buffer
+	z := zip.NewWriter(&b)
+	w, _ := z.CreateRaw(&zip.FileHeader{Name: "a.txt", Method: 12, CompressedSize64: 4, UncompressedSize64: 10 << 20, CRC32: 1})
+	w.Write([]byte("BZh9"))
+	z.Close()
+	_, skipped, err := walkAll(t, &Extractor{}, Kind{LibArchive, "zip"}, "b.zip", b.Bytes(), WalkOptions{})
+	if err != nil || len(skipped) != 1 || skipped[0].Reason != "compressed with a method not supported (12)" {
+		t.Errorf("%+v %v", skipped, err)
+	}
+}
+
+// TestDanglingLink: a hard link to a file not in the archive is a member
+// not read, not a note.
+func TestDanglingLink(t *testing.T) {
+	var b bytes.Buffer
+	w := tar.NewWriter(&b)
+	w.WriteHeader(&tar.Header{Name: "report.txt", Typeflag: tar.TypeLink, Linkname: "elsewhere/report.txt"})
+	w.Close()
+	_, skipped, err := walkAll(t, &Extractor{}, Kind{LibArchive, "tar"}, "d.tar", b.Bytes(), WalkOptions{})
+	if err != nil || len(skipped) != 1 || skipped[0].Note || !strings.Contains(skipped[0].Reason, "not in the archive") {
+		t.Errorf("%+v %v", skipped, err)
+	}
+}

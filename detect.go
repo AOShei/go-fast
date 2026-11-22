@@ -276,8 +276,12 @@ func sniffZip(r io.ReaderAt, size int64) Kind {
 // header only mail carries.
 func messageHeaders(head []byte) bool {
 	known, strong, lines := 0, 0, 0
+	cut := len(head) == sniffBytes // the input goes on past what is looked at
 	for len(head) > 0 && lines < 32 {
-		line, rest, _ := bytes.Cut(head, []byte("\n"))
+		line, rest, ok := bytes.Cut(head, []byte("\n"))
+		if !ok && cut {
+			break // a line cut off by the end of what is looked at
+		}
 		head = rest
 		line = bytes.TrimRight(line, "\r")
 		if len(line) == 0 {

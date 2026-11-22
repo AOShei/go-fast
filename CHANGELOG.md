@@ -30,7 +30,7 @@ and archives.
   2,699 corpus files read with no Validate error; tests for detection,
   archives, bounds, order, `-dir` and failures; `FuzzArchive`,
   `FuzzDetect`; CI on Linux, macOS and Windows, Go 1.25 and stable. An
-  independent review's fourteen findings (among them a hang when a
+  independent review's findings, in two rounds (among them a hang when a
   memory bound was smaller than nested archives, nested members not
   counted against memory, sparse tar members, a decode budget not
   settled before children) are fixed, with a test for each.

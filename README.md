@@ -54,7 +54,7 @@ A file read from an archive gives the same document as the file read on its own,
 - a member past one of the bounds below;
 - an archive nested past `-max-depth`.
 
-A tar hard link is another name for a member read under its own name: it is noted on standard error, not counted as a failure. Directories, symbolic links and devices are skipped silently.
+A tar hard link to a member before it is another name for that member, read under its own name: it is noted on standard error, not counted as a failure. A hard link to a file not in the archive is a member not read. Directories, symbolic links and devices are skipped silently.
 
 A member's name is cleaned: no leading `/` or drive letter, and no `.` element or control character.
 
@@ -85,7 +85,7 @@ gofast [flags] file-or-directory...
 **Output.**
 - With one input that is not an archive, the JSON is indented.
 - Otherwise each document is one line (JSON Lines), **in the order of the inputs and of the members of each archive**, whatever order the workers finish in.
-- `-dir DIR` writes each document to a file of its own instead, in a tree that mirrors the inputs: `DIR/sub/a.pdf.json`, or `DIR/data.zip/reports/q3.pdf.json` for an archive member. Nothing is written outside `DIR`, whatever a member's name says. Names are made ones every system can create: characters Windows forbids become `_`, a trailing dot or space is replaced, and a device name such as `CON` or `NUL` gets a leading `_`. Two documents whose files would differ only in case are reported, not written over each other.
+- `-dir DIR` writes each document to a file of its own instead, in a tree that mirrors the inputs: `DIR/sub/a.pdf.json`, or `DIR/data.zip/reports/q3.pdf.json` for an archive member. Nothing is written outside `DIR`, whatever a member's name says. Names are made ones every system can create: characters Windows forbids become `_`, a trailing dot or space is replaced, and a device name such as `CON` or `NUL` gets a leading `_`. Where the file system ignores case (Windows, macOS), a document whose file would differ from another's only in case is written with `~2` (`~3`, ...) before its extension, and noted on standard error.
 - Interrupting the run (Ctrl-C) stops it; a second interrupt ends it at once.
 - Only documents go to standard output. Errors, and a note for each document with an error-level warning, go to standard error, with a summary line at the end. The exit status is 1 if any input or member could not be read, and 2 for a usage error.
 

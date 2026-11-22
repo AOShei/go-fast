@@ -510,15 +510,15 @@ func newMemory(ctx context.Context, limit int64) *memory {
 
 // hold waits until n bytes fit beside what others hold (own is what the
 // caller itself holds, which it cannot give back while it waits), takes
-// them, and returns the function that gives them back. It gives up when
-// the run is cancelled.
+// them, and returns the function that gives them back. More than the
+// bound is taken when nothing else is held, so a large member is read
+// alone. It gives up when the run is cancelled.
 func (m *memory) hold(n, own int64) (func(), error) {
 	if m.cap < 0 {
 		return func() {}, nil
 	}
-	n = min(n, m.cap) // a larger member is read alone
 	m.mu.Lock()
-	for m.used-own > 0 && m.used+n > m.cap && m.ctx.Err() == nil {
+	for m.used-own > 0 && m.used > m.cap-min(n, m.cap) && m.ctx.Err() == nil {
 		m.cond.Wait()
 	}
 	if err := m.ctx.Err(); err != nil {
@@ -658,12 +658,17 @@ func (w *writer) writeFile(r result) error {
 	if err != nil {
 		return err
 	}
-	// Names that differ only in case are one file on Windows and macOS.
-	key := strings.ToLower(p)
-	if w.paths[key] {
-		return fmt.Errorf("another input was already written to %s", p)
+	// Names that differ only in case are one file on Windows and macOS:
+	// there, the second gets a number.
+	for i := 2; w.paths[pathKey(p)]; i++ {
+		q := strings.TrimSuffix(p, extensions[w.c.format]) + fmt.Sprintf("~%d", i) + extensions[w.c.format]
+		if !w.paths[pathKey(q)] {
+			fmt.Fprintf(w.stderr, "%s: written to %s, as another document's file has the same name but for case\n", r.display, q)
+			p = q
+			break
+		}
 	}
-	w.paths[key] = true
+	w.paths[pathKey(p)] = true
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
@@ -725,6 +730,15 @@ func outputPath(dir, rel, ext string) (string, error) {
 		return "", fmt.Errorf("%s is outside %s", path.Clean(rel), dir)
 	}
 	return p, nil
+}
+
+// pathKey is what makes two output files one: their names, without
+// case where the file system ignores it.
+func pathKey(p string) string {
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		return strings.ToLower(p)
+	}
+	return p
 }
 
 // reserved reports whether a name is a Windows device name, with or

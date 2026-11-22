@@ -93,6 +93,15 @@ type archiveWalker struct {
 // errBudget stops a walk whose decompression bound is reached.
 var errBudget = errors.New("the bound on bytes decompressed from the archive was reached")
 
+// errHold wraps an error from WalkOptions.Hold, which stops the walk.
+var errHold = errors.New("gofast: holding a member's bytes")
+
+// stops reports whether an error from reading a member ends the walk:
+// the decompression bound, Hold refusing, or the walk cancelled.
+func (w *archiveWalker) stops(err error) bool {
+	return errors.Is(err, errBudget) || errors.Is(err, errHold) || w.ctx.Err() != nil
+}
+
 // walk calls fn for every regular file of the archive r, in the order the
 // archive stores them, and skip for every member left out. fn owns each
 // member and calls its Release. A nested archive is a member like any
@@ -157,7 +166,7 @@ func (w *archiveWalker) walkZip(r io.ReaderAt, size int64, fn func(Member) error
 			}
 			// No more than deflate can make of the compressed bytes is
 			// believed: a member said to be larger is damaged.
-			if f.UncompressedSize64 > f.CompressedSize64*deflateRatio+1024 {
+			if f.Method == zip.Deflate && f.UncompressedSize64 > f.CompressedSize64*deflateRatio+1024 {
 				skip(Skipped{Path: name, Reason: "damaged: its size is more than its compressed size allows"})
 				continue
 			}
@@ -173,7 +182,7 @@ func (w *archiveWalker) walkZip(r io.ReaderAt, size int64, fn func(Member) error
 			var rerr error
 			m, rerr = w.read(name, rc, int64(f.UncompressedSize64), int64(f.UncompressedSize64), true)
 			rc.Close()
-			if errors.Is(rerr, errBudget) || w.ctx.Err() != nil {
+			if w.stops(rerr) {
 				return rerr
 			}
 			if rerr != nil {
@@ -239,6 +248,7 @@ func sparse(h *tar.Header) bool {
 func (w *archiveWalker) walkTar(src io.Reader, inPlace bool, fn func(Member) error, skip func(Skipped)) error {
 	tr := tar.NewReader(src)
 	sr, _ := src.(*io.SectionReader)
+	seen := map[string]bool{} // regular members, for hard links to them
 	for {
 		if err := w.ctx.Err(); err != nil {
 			return err
@@ -256,7 +266,11 @@ func (w *archiveWalker) walkTar(src io.Reader, inPlace bool, fn func(Member) err
 		if h.Typeflag == tar.TypeLink {
 			if name, ok := memberPath(h.Name); ok {
 				target, _ := memberPath(h.Linkname)
-				skip(Skipped{Path: name, Reason: fmt.Sprintf("a hard link to %s, which is read under that name", target), Note: true})
+				if seen[target] {
+					skip(Skipped{Path: name, Reason: fmt.Sprintf("a hard link to %s, which is read under that name", target), Note: true})
+				} else {
+					skip(Skipped{Path: name, Reason: fmt.Sprintf("a hard link to %s, which is not in the archive before it", target)})
+				}
 			}
 			continue
 		}
@@ -268,6 +282,7 @@ func (w *archiveWalker) walkTar(src io.Reader, inPlace bool, fn func(Member) err
 			skip(Skipped{Path: cleanName(h.Name), Reason: "its name is not a path inside the archive"})
 			continue
 		}
+		seen[name] = true
 		if sparse(h) {
 			skip(Skipped{Path: name, Reason: "a sparse file, which is not read"})
 			continue
@@ -295,7 +310,7 @@ func (w *archiveWalker) walkTar(src io.Reader, inPlace bool, fn func(Member) err
 			// The stream is taken from the bound as it is read.
 			var rerr error
 			m, rerr = w.read(name, tr, h.Size, h.Size, false)
-			if errors.Is(rerr, errBudget) || w.ctx.Err() != nil {
+			if w.stops(rerr) {
 				return rerr
 			}
 			if rerr != nil {
@@ -328,7 +343,7 @@ func (w *archiveWalker) walkGzip(r io.ReaderAt, size int64, name string, fn func
 	}
 	// The stream says nothing of its size; deflate bounds it.
 	m, err := w.read(inner, br, -1, size*deflateRatio+1024, false)
-	if errors.Is(err, errBudget) || w.ctx.Err() != nil {
+	if w.stops(err) {
 		return err
 	}
 	if err != nil {
@@ -377,7 +392,7 @@ func (w *archiveWalker) read(name string, src io.Reader, declared, most int64, b
 	if w.hold != nil {
 		r, err := w.hold(held, w.own)
 		if err != nil {
-			return Member{}, err
+			return Member{}, fmt.Errorf("%w: %w", errHold, err)
 		}
 		release = r
 	}
@@ -390,6 +405,8 @@ func (w *archiveWalker) read(name string, src io.Reader, declared, most int64, b
 		err = fmt.Errorf("%w (%d bytes)", errMember, limit)
 	case declared >= 0 && n != declared:
 		err = errors.New("damaged: its size is not the size the archive gives")
+	case w.ctx.Err() != nil:
+		err = w.ctx.Err()
 	}
 	if err != nil {
 		release()

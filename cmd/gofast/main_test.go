@@ -270,3 +270,18 @@ func TestStdinBound(t *testing.T) {
 		t.Errorf("status %d: %s", status, errs)
 	}
 }
+
+// TestCaseNames: two members whose names differ only in case are both
+// written; where the file system ignores case the second gets a number.
+func TestCaseNames(t *testing.T) {
+	in, out := t.TempDir(), t.TempDir()
+	writeZip(t, filepath.Join(in, "case.zip"), [2]string{"README", "upper"}, [2]string{"readme", "lower"})
+	_, errs, status := runCmd(t, "", "-quiet", "-dir", out, filepath.Join(in, "case.zip"))
+	if status != 0 {
+		t.Fatalf("status %d: %s", status, errs)
+	}
+	entries, _ := os.ReadDir(filepath.Join(out, "case.zip"))
+	if len(entries) != 2 {
+		t.Errorf("files: %v\n%s", entries, errs)
+	}
+}
