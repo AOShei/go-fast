@@ -30,13 +30,18 @@ and archives.
   go-fast-email for text in messages, and used for a file go-fast-html
   refuses with `ErrEncodingUnknown`; never before, so it does not override
   a `<meta>`.
-- Pins: go-fast-core v0.1.2, go-fast-pdf v0.2.2, go-fast-ooxml v0.1.1,
+- Pins: go-fast-core v0.1.2, go-fast-pdf v0.3.0, go-fast-ooxml v0.1.1,
   go-fast-odf v0.2.0, go-fast-rtf v0.2.0, go-fast-email v0.2.0,
   go-fast-html v0.3.0. Over the 6,644 documents of the public corpus and
   go-fast-ooxml's, the same files are read as with the earlier pins
   (go-fast-core v0.1.1, -pdf v0.2.1, -odf v0.1.3, -rtf v0.1.2, -email
   v0.1.3, -html v0.2.0); 12 documents differ, by the shared warning codes
   and the warnings now raised where control characters are removed.
+  go-fast-pdf v0.3.0 (after v0.2.2) adds `input.decrypted` and
+  `text.control_characters_removed`: over the 1,650 PDF files of the
+  public corpus, the same files are read, 1,575 documents are the same,
+  35 differ only by those warnings, 3 lose U+FFFD from their strings, and
+  1 loses the language escapes of its document information.
 - Checks: files read from zip, tar and tar.gz archives give the same
   documents as the files read on their own (449 files of every format);
   2,699 corpus files read with no Validate error; tests for detection,

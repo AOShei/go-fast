@@ -8,6 +8,6 @@ require (
 	github.com/AOShei/go-fast-html v0.3.0
 	github.com/AOShei/go-fast-odf v0.2.0
 	github.com/AOShei/go-fast-ooxml v0.1.1
-	github.com/AOShei/go-fast-pdf v0.2.2
+	github.com/AOShei/go-fast-pdf v0.3.0
 	github.com/AOShei/go-fast-rtf v0.2.0
 )
