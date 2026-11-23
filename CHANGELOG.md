@@ -30,7 +30,7 @@ and archives.
   go-fast-email for text in messages, and used for a file go-fast-html
   refuses with `ErrEncodingUnknown`; never before, so it does not override
   a `<meta>`.
-- Pins: go-fast-core v0.1.2, go-fast-pdf v0.3.0, go-fast-ooxml v0.1.1,
+- Pins: go-fast-core v0.1.2, go-fast-pdf v0.3.0, go-fast-ooxml v0.2.0,
   go-fast-odf v0.2.0, go-fast-rtf v0.2.0, go-fast-email v0.2.0,
   go-fast-html v0.3.0. Over the 6,644 documents of the public corpus and
   go-fast-ooxml's, the same files are read as with the earlier pins
@@ -42,6 +42,11 @@ and archives.
   public corpus, the same files are read, 1,575 documents are the same,
   35 differ only by those warnings, 3 lose U+FFFD from their strings, and
   1 loses the language escapes of its document information.
+  go-fast-ooxml v0.2.0 (after v0.1.1) raises the shared codes of core
+  v0.1.2 in place of seven of its own and sets `Metadata.Encrypted`: over
+  its 6,615 corpus and soak files, the same files are read, 6,513
+  documents are the same, and 102 differ only by the code strings, the
+  message on damaged document properties and `encrypted: true`.
 - Checks: files read from zip, tar and tar.gz archives give the same
   documents as the files read on their own (449 files of every format);
   2,699 corpus files read with no Validate error; tests for detection,
