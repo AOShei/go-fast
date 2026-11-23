@@ -16,6 +16,8 @@ import (
 	"sync"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/AOShei/go-fast-core/inflate"
 )
 
 // Defaults of the bounds on archives.
@@ -34,6 +36,10 @@ const (
 	// archive it is given as a document of its own, with no such bound.
 	DefaultMaxArchiveMembers = 10000
 )
+
+// maxGzipHeld bounds a gzip file that is read into memory to be
+// decompressed with inflate; a larger one is read with compress/gzip.
+const maxGzipHeld = 64 << 20
 
 // deflateRatio bounds how many bytes deflate can make of one: 1,032 at
 // most. A member said to be larger than its compressed size allows is
@@ -124,6 +130,9 @@ func (w *archiveWalker) walkZip(r io.ReaderAt, size int64, fn func(Member) error
 	if err != nil && !errors.Is(err, zip.ErrInsecurePath) {
 		return fmt.Errorf("gofast: zip: %v: %w", err, ErrArchive)
 	}
+	// Deflated members are read with go-fast-core's inflate, about twice
+	// as fast as compress/flate.
+	z.RegisterDecompressor(zip.Deflate, inflate.Decompressor)
 	if err := overlapping(z.File); err != nil {
 		return err
 	}
@@ -332,7 +341,17 @@ func (w *archiveWalker) walkGzip(r io.ReaderAt, size int64, name string, fn func
 		return fmt.Errorf("gofast: gzip: %v: %w", err, ErrArchive)
 	}
 	defer zr.Close()
-	br := bufio.NewReaderSize(&budgetReader{r: zr, w: w}, 64<<10)
+	var stream io.Reader = zr
+	if size <= maxGzipHeld {
+		// A file small enough to hold is read with go-fast-core's
+		// inflate, about twice as fast as compress/gzip; zr has read
+		// its header, for the name.
+		src := make([]byte, size)
+		if n, _ := r.ReadAt(src, 0); int64(n) == size {
+			stream = inflate.NewGzipReader(src, 1<<62)
+		}
+	}
+	br := bufio.NewReaderSize(&budgetReader{r: stream, w: w}, 64<<10)
 	head, _ := br.Peek(262)
 	inner := innerName(name, zr.Header.Name)
 	if len(head) >= 262 && string(head[257:262]) == "ustar" || strings.HasSuffix(strings.ToLower(inner), ".tar") {
