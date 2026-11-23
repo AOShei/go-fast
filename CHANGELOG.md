@@ -30,7 +30,7 @@ and archives.
   go-fast-email for text in messages, and used for a file go-fast-html
   refuses with `ErrEncodingUnknown`; never before, so it does not override
   a `<meta>`.
-- Pins: go-fast-core v0.1.2, go-fast-pdf v0.3.0, go-fast-ooxml v0.2.0,
+- Pins: go-fast-core v0.1.2, go-fast-pdf v0.3.0, go-fast-ooxml v0.3.0,
   go-fast-odf v0.2.0, go-fast-rtf v0.2.0, go-fast-email v0.2.0,
   go-fast-html v0.3.0. Over the 6,644 documents of the public corpus and
   go-fast-ooxml's, the same files are read as with the earlier pins
@@ -47,6 +47,12 @@ and archives.
   its 6,615 corpus and soak files, the same files are read, 6,513
   documents are the same, and 102 differ only by the code strings, the
   message on damaged document properties and `encrypted: true`.
+  go-fast-ooxml v0.3.0 (after v0.2.0) is faster and uses less memory,
+  rounds the fifteenth digit of a number as LibreOffice does, reads the
+  fonts of a cell's runs, and corrects two warning messages: over the same
+  6,615 files, the same files are read, 6,582 documents are the same, 31
+  differ by 5,515 numbers in their fifteenth digit, and 2 by the message
+  on Excel 4.0 macro sheets.
 - Checks: files read from zip, tar and tar.gz archives give the same
   documents as the files read on their own (449 files of every format);
   2,699 corpus files read with no Validate error; tests for detection,
