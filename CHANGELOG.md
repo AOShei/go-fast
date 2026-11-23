@@ -22,9 +22,21 @@ and archives.
   zip members larger than their compressed size allows are not read;
   member names are cleaned, and `-dir` writes nothing outside its
   directory, with names every system can create.
-- Pins: go-fast-core v0.1.1, go-fast-pdf v0.2.1, go-fast-ooxml v0.1.1,
-  go-fast-odf v0.1.3, go-fast-rtf v0.1.2, go-fast-email v0.1.3,
-  go-fast-html v0.2.0.
+- **JSON and YAML** (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`,
+  `.yml`, and their media types) go to go-fast-html, as text; never by
+  content.
+- **`-charset`** (`Extractor.Charset`): the character set of text that
+  declares none and whose set is not certain from its bytes. Given to
+  go-fast-email for text in messages, and used for a file go-fast-html
+  refuses with `ErrEncodingUnknown`; never before, so it does not override
+  a `<meta>`.
+- Pins: go-fast-core v0.1.2, go-fast-pdf v0.2.2, go-fast-ooxml v0.1.1,
+  go-fast-odf v0.2.0, go-fast-rtf v0.2.0, go-fast-email v0.2.0,
+  go-fast-html v0.3.0. Over the 6,644 documents of the public corpus and
+  go-fast-ooxml's, the same files are read as with the earlier pins
+  (go-fast-core v0.1.1, -pdf v0.2.1, -odf v0.1.3, -rtf v0.1.2, -email
+  v0.1.3, -html v0.2.0); 12 documents differ, by the shared warning codes
+  and the warnings now raised where control characters are removed.
 - Checks: files read from zip, tar and tar.gz archives give the same
   documents as the files read on their own (449 files of every format);
   2,699 corpus files read with no Validate error; tests for detection,

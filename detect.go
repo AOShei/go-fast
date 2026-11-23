@@ -59,6 +59,8 @@ var byExtension = map[string]Kind{
 	".txt": {LibHTML, "txt"}, ".text": {LibHTML, "txt"},
 	".epub": {LibHTML, "epub"}, ".csv": {LibHTML, "csv"}, ".tsv": {LibHTML, "tsv"}, ".tab": {LibHTML, "tsv"},
 	".ipynb": {LibHTML, "ipynb"},
+	".json":  {LibHTML, "json"}, ".jsonl": {LibHTML, "json"}, ".ndjson": {LibHTML, "json"}, ".geojson": {LibHTML, "json"},
+	".yaml": {LibHTML, "yaml"}, ".yml": {LibHTML, "yaml"},
 
 	".zip": {LibArchive, "zip"}, ".tar": {LibArchive, "tar"}, ".tgz": {LibArchive, "gzip"}, ".gz": {LibArchive, "gzip"},
 }
@@ -100,6 +102,9 @@ var byMIME = map[string]Kind{
 	"text/markdown": {LibHTML, "md"}, "text/plain": {LibHTML, "txt"},
 	"text/csv": {LibHTML, "csv"}, "text/tab-separated-values": {LibHTML, "tsv"},
 	"application/x-ipynb+json": {LibHTML, "ipynb"}, "application/epub+zip": {LibHTML, "epub"},
+	"application/json": {LibHTML, "json"}, "application/x-ndjson": {LibHTML, "json"}, "application/geo+json": {LibHTML, "json"},
+	"application/yaml": {LibHTML, "yaml"}, "application/x-yaml": {LibHTML, "yaml"}, "text/yaml": {LibHTML, "yaml"},
+	"text/x-yaml": {LibHTML, "yaml"},
 
 	"application/zip": {LibArchive, "zip"}, "application/x-zip-compressed": {LibArchive, "zip"},
 	"application/x-tar": {LibArchive, "tar"},

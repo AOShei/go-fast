@@ -20,7 +20,7 @@ gofast -format markdown notes.docx       # one document as Markdown
 | OpenDocument text, spreadsheets and presentations, and their flat XML forms | [go-fast-odf](https://github.com/AOShei/go-fast-odf) |
 | RTF | [go-fast-rtf](https://github.com/AOShei/go-fast-rtf) |
 | Email: `.eml`, `.mbox`, Outlook `.msg`, TNEF (`winmail.dat`) | [go-fast-email](https://github.com/AOShei/go-fast-email) |
-| HTML, Markdown, plain text, EPUB, CSV, TSV, Jupyter notebooks | [go-fast-html](https://github.com/AOShei/go-fast-html) |
+| HTML, Markdown, plain text, EPUB, CSV, TSV, Jupyter notebooks, JSON and YAML (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`, `.yml`; as text, never by content) | [go-fast-html](https://github.com/AOShei/go-fast-html) |
 | zip, tar, gzip (`.tar.gz`, `.tgz`, `.gz`) | this module |
 
 **How the format is decided** (`Detect`):
@@ -36,6 +36,8 @@ gofast -format markdown notes.docx       # one document as Markdown
    - Anything else is what go-fast-html makes of it: HTML when it is markup, else plain text.
 
 Office 97–2003 files (`.doc`, `.xls`, `.ppt`) are not read yet; a library for them is being written.
+
+**Text that declares no character set** and is not UTF-8 is read in the set its bytes are certainly in (Shift_JIS, GBK, Big5, EUC-KR, windows-1251, windows-1252, UTF-16 without a byte order mark), with the warning `text.encoding_detected`, by go-fast-html and go-fast-email. Where no set is certain, a text file is refused (`gofasthtml.ErrEncodingUnknown`, which wraps `ErrUnsupported`) and a message's text keeps U+FFFD; `-charset` (`Extractor.Charset`) gives the set to use then. It never overrides a set the input declares: a `<meta>` or a `charset` parameter wins.
 
 **Embedded documents** are read by whichever library reads their format. A PDF attached to a message, a workbook embedded in a presentation, and a zip attached to a message (whose members become the zip's children) all come with the document that holds them. Core's depth limit (`-max-depth`, default 4) bounds how deeply they nest.
 
@@ -99,6 +101,7 @@ gofast [flags] file-or-directory...
 | `-spans` | inline styling, links, and declared display of ranges of text |
 | `-cells` | the cells of spreadsheets with their types and formulas |
 | `-password` | for encrypted files |
+| `-charset LABEL` | the character set (`shift_jis`, `gbk`, `windows-1250`, ...) of text that declares none and whose set is not certain from its bytes; without it such a text file is not read, and text in a message has U+FFFD |
 | `-max-input-bytes`, `-max-decoded-bytes`, `-max-text-bytes`, `-max-depth` | core's limits (`gofastcore.Limits`), for every document; `-max-input-bytes` also bounds standard input and pipes |
 | `-max-member-bytes`, `-max-archive-bytes`, `-max-memory-bytes` | the archive bounds above |
 | `-quiet` | say nothing about files that were read |

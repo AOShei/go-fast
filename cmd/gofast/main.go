@@ -89,6 +89,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		spans       = flags.Bool("spans", false, "record inline styling, links and declared display of ranges of text")
 		cells       = flags.Bool("cells", false, "record the cells of spreadsheets with their types and formulas")
 		password    = flags.String("password", "", "password passed to the extractor of encrypted files")
+		charset     = flags.String("charset", "", "the character set (shift_jis, gbk, windows-1250, ...) of text that declares none and whose set is not recognised from its bytes: such text files are refused without it, and text in messages has U+FFFD")
 		maxInput    = flags.Int64("max-input-bytes", 0, "bytes of one file or member (0: each library's default; -1: no limit)")
 		maxDecoded  = flags.Int64("max-decoded-bytes", 0, "bytes decompressed in one document and the files embedded in it (0: each library's default; -1: no limit)")
 		maxText     = flags.Int64("max-text-bytes", 0, "bytes of text a document and the files embedded in it may hold (0: the default, 256 MiB; -1: no limit)")
@@ -134,7 +135,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	}
 	c := &config{format: *format, output: *output, dir: *dir, jobs: *jobs, quiet: *quiet, maxDepth: *maxDepth,
 		maxMemory: *maxMemory, maxInput: *maxInput,
-		extractor: &gofast.Extractor{MaxMemberBytes: *maxMember, MaxArchiveBytes: *maxArchive}}
+		extractor: &gofast.Extractor{MaxMemberBytes: *maxMember, MaxArchiveBytes: *maxArchive, Charset: *charset}}
 	if c.maxMemory == 0 {
 		c.maxMemory = 4 << 30
 	}
