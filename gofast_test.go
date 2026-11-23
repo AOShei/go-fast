@@ -98,6 +98,13 @@ func TestDetect(t *testing.T) {
 		{"x.csv", "", nil, Kind{LibHTML, "csv"}},
 		{"x", "text/csv; header=present", nil, Kind{LibHTML, "csv"}},
 		{"nb.ipynb", "", nil, Kind{LibHTML, "ipynb"}},
+		{"data.JSON", "", nil, Kind{LibHTML, "json"}},
+		{"log.ndjson", "", nil, Kind{LibHTML, "json"}},
+		{"map.geojson", "", nil, Kind{LibHTML, "json"}},
+		{"x", "application/json; charset=utf-8", nil, Kind{LibHTML, "json"}},
+		{"conf.yml", "", nil, Kind{LibHTML, "yaml"}},
+		{"x", "application/yaml", nil, Kind{LibHTML, "yaml"}},
+		{"noext", "", []byte(`{"a": 1}`), Kind{LibHTML, "txt"}}, // never by content
 		{"old.doc", "", []byte("\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"), Kind{}},
 		{"photo.jpg", "", []byte("\xFF\xD8\xFF\xE0\x00\x10JFIF\x00"), Kind{}},
 		{"noext", "", []byte("\xFF\xFEa\x00b\x00"), Kind{LibHTML, "txt"}},

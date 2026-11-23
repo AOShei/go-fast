@@ -285,3 +285,19 @@ func TestCaseNames(t *testing.T) {
 		t.Errorf("files: %v\n%s", entries, errs)
 	}
 }
+
+// TestCharsetFlag: a text file whose set is not certain is not read
+// without -charset, and the error says to give it; with it, it is read.
+func TestCharsetFlag(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "cz.txt")
+	os.WriteFile(p, []byte("Voda pokr\xfdv\xe1 p\xf8ibli\x9en\xec sedmdes\xe1t procent zemsk\xe9ho povrchu. \xc8esk\xe9 \xf8eky.\n"), 0o644)
+	_, errs, status := runCmd(t, "", "-quiet", p)
+	if status != 1 || !strings.Contains(errs, "-charset") {
+		t.Errorf("without -charset: %d %s", status, errs)
+	}
+	out, errs, status := runCmd(t, "", "-quiet", "-format", "text", "-charset", "windows-1250", p)
+	if status != 0 || !strings.Contains(out, "České řeky") {
+		t.Errorf("with -charset: %d %q %s", status, out, errs)
+	}
+}

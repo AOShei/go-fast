@@ -31,6 +31,16 @@ type Extractor struct {
 	// read as one document (Extract, or an archive embedded in a
 	// document). Zero means DefaultMaxArchiveMembers; negative, no bound.
 	MaxArchiveMembers int
+	// Charset is the character set, as a MIME charset label ("shift_jis",
+	// "windows-1251"), of text that declares none and whose set the
+	// library reading it cannot determine from its bytes. go-fast-email
+	// uses it for such text in messages (gofastemail.Extractor.Charset).
+	// HTML, Markdown, plain text, CSV, TSV, JSON and YAML that
+	// go-fast-html refuses with gofasthtml.ErrEncodingUnknown are read
+	// again in it; it is not given to go-fast-html before, since there it
+	// would override a <meta> declaration. Empty means none: such input is
+	// refused, and a message's text keeps U+FFFD.
+	Charset string
 }
 
 // Formats lists the formats Extract reads: those of every library, and
@@ -82,7 +92,7 @@ func (e *Extractor) ExtractKind(ctx context.Context, k Kind, mimeType string, r 
 	case LibRTF:
 		return (&gofastrtf.Extractor{}).Extract(ctx, r, size, opts)
 	case LibEmail:
-		doc, err := (&gofastemail.Extractor{}).Extract(ctx, r, size, opts)
+		doc, err := (&gofastemail.Extractor{Charset: e.Charset}).Extract(ctx, r, size, opts)
 		if err != nil && opts != nil && isCompoundFile(r) && !strings.EqualFold(pathExt(opts.Name), ".msg") &&
 			(errors.Is(err, gofastcore.ErrMalformed) || errors.Is(err, gofastcore.ErrUnsupported)) {
 			return nil, fmt.Errorf("gofast: an OLE compound file that is not an Outlook message (Office 97-2003 files are not read yet): %w", gofastcore.ErrUnsupported)
@@ -91,7 +101,12 @@ func (e *Extractor) ExtractKind(ctx context.Context, k Kind, mimeType string, r 
 	case LibHTML:
 		x := &gofasthtml.Extractor{Format: k.Format, Charset: param(mimeType, "charset")}
 		x.Header = strings.EqualFold(param(mimeType, "header"), "present")
-		return x.Extract(ctx, r, size, opts)
+		doc, err := x.Extract(ctx, r, size, opts)
+		if errors.Is(err, gofasthtml.ErrEncodingUnknown) && x.Charset == "" && e.Charset != "" {
+			x.Charset = e.Charset
+			return x.Extract(ctx, r, size, opts)
+		}
+		return doc, err
 	case LibArchive:
 		return e.archiveDocument(ctx, k.Format, r, size, opts)
 	}
