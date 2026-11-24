@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.0 (2026-11-24)
 
 The first version: one command and one package for every go-fast format,
 and archives.
@@ -67,7 +67,7 @@ and archives.
 - Pins: go-fast-core v0.1.6 (the comparisons below were made with
   v0.1.2), go-fast-pdf v0.3.0, go-fast-ooxml v0.4.0,
   go-fast-odf v0.2.2, go-fast-rtf v0.2.1, go-fast-email v0.2.1,
-  go-fast-html v0.4.4. Against go-fast-odf v0.2.0, -rtf v0.2.0, -email
+  go-fast-html v0.4.4, go-fast-xml v0.1.0. Against go-fast-odf v0.2.0, -rtf v0.2.0, -email
   v0.2.0 and -html v0.3.0, over the 22,421 ODF, RTF, email and HTML
   documents of the benchmark set and the 506 the command reads of the
   public corpus, with default flags and with `-cells -spans -images data`,
