@@ -16,7 +16,7 @@ gofast -format markdown notes.docx       # one document as Markdown
 | Formats | Library |
 |---|---|
 | PDF | [go-fast-pdf](https://github.com/AOShei/go-fast-pdf) |
-| Word, Excel and PowerPoint 2007 and later (`.docx`, `.xlsx`, `.xlsb`, `.pptx` and their macro and template variants) | [go-fast-ooxml](https://github.com/AOShei/go-fast-ooxml) |
+| Word, Excel and PowerPoint 2007 and later (`.docx`, `.xlsx`, `.xlsb`, `.pptx` and their macro and template variants), and Office documents saved as one XML file: Flat OPC, Word 2003's XML document and Excel 2003's XML spreadsheet | [go-fast-ooxml](https://github.com/AOShei/go-fast-ooxml) |
 | OpenDocument text, spreadsheets and presentations, and their flat XML forms | [go-fast-odf](https://github.com/AOShei/go-fast-odf) |
 | RTF | [go-fast-rtf](https://github.com/AOShei/go-fast-rtf) |
 | Email: `.eml`, `.mbox`, Outlook `.msg`, TNEF (`winmail.dat`) | [go-fast-email](https://github.com/AOShei/go-fast-email) |
@@ -35,6 +35,8 @@ gofast -format markdown notes.docx       # one document as Markdown
    - An OLE compound file, a TNEF stream, a mailbox's `From ` line (an address, then a date with a time) or a message's header lines (at least two of the headers messages have, one of them `From`, `Received`, `Return-Path`, `Message-ID`, `MIME-Version` or `Delivered-To`) are email.
    - An OpenDocument flat XML file is OpenDocument.
    - XML is go-fast-xml's: input that begins with an XML declaration (`<?xml`), that has a document type declaration naming a root element other than `html`, or whose first element declares a namespace. A first element named `html` or `svg`, or in the XHTML or SVG namespace, stays with go-fast-html. XML with none of these marks (no declaration, no document type, no namespace) is read as HTML, unless its name or media type says XML.
+
+**Office documents saved as XML** go to go-fast-ooxml, whichever of the steps above sent them to go-fast-xml (a `.xml` name, an XML media type, or the bytes). They are known by the root element and its namespace, within the first 64 KiB, as go-fast-ooxml knows them: Flat OPC's `pkg:package` (read as `docx`, `xlsx` or `pptx`, with `extra.packaging` `flat_opc`), Word 2003's `w:wordDocument` (format `wordml`) and Excel 2003's `Workbook` (format `spreadsheetml`). XML with a document type declaration stays with go-fast-xml. The root is found in UTF-8, UTF-16 and the single- and double-byte sets Office writes (the Windows code pages, ISO 8859, Shift_JIS, GBK, EUC-KR, Big5). The media types `application/vnd.ms-wordml` and `application/vnd.ms-spreadsheetml` go to go-fast-ooxml too.
    - Binary input (images, audio, executables) is read by none.
    - Anything else is what go-fast-html makes of it: HTML when it is markup, else plain text.
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased]
+
+- **Office documents saved as XML are read by go-fast-ooxml** (v0.5.0,
+  after v0.4.0): Flat OPC (`pkg:package`, read as `docx`, `xlsx` or
+  `pptx` with `extra.packaging` `flat_opc`), Word 2003's XML document
+  (`w:wordDocument`, format `wordml`) and Excel 2003's XML spreadsheet
+  (`Workbook`, format `spreadsheetml`). They are known by the root
+  element and its namespace within the first 64 KiB, whatever their name
+  or media type: before, they went to go-fast-xml, which read them as
+  generic XML (deleted revisions as text, pictures as base64, no
+  headings or cell formats). XML with a document type declaration stays
+  with go-fast-xml. `application/vnd.ms-wordml` and
+  `application/vnd.ms-spreadsheetml` go to go-fast-ooxml.
+- **Checked:** the 42 such files of go-fast-ooxml's soak set give, through
+  `gofast`, what `gofastooxml` gives (in one, only the wording of errors
+  for embedded Office 97-2003 files, which the umbrella reads itself).
+  The 5,036 documents of the public corpus's dev set, and its held-out
+  set compared by hash, are unchanged from v0.1.0.
+
 ## v0.1.0 (2026-11-24)
 
 The first version: one command and one package for every go-fast format,
