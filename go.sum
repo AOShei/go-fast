@@ -14,5 +14,5 @@ github.com/AOShei/go-fast-pdf v0.3.0 h1:7I9vTQOAuNky/bn67lPXQ9RJIYh/R2rKE2cSWEuo
 github.com/AOShei/go-fast-pdf v0.3.0/go.mod h1:V/fSm//mFiaJl/vZ8ZL1WCf5Vr504NS99Q6HObjTbMs=
 github.com/AOShei/go-fast-rtf v0.2.1 h1:6IrxwvoZy2P2a3LtyLCzlP/Mt6/nwvRNo6lzzDPBS60=
 github.com/AOShei/go-fast-rtf v0.2.1/go.mod h1:ONgqER0kTL3EYECOOHS7jARnkEe7Iu1kkvV3AVvYoV0=
-github.com/AOShei/go-fast-xml v0.1.0 h1:NRJHNxS620OwXP5+I2FUWaTF+2Jyp9DVtFESDNJB/90=
-github.com/AOShei/go-fast-xml v0.1.0/go.mod h1:KnLszhWMiXMDD1n7C125SM065IZYlSJBSVHoHbEjtoU=
+github.com/AOShei/go-fast-xml v0.2.0 h1:qxa/wbCG1m+nEYvlXltrCRZyGrt3JXXJVPb4k6rMQZg=
+github.com/AOShei/go-fast-xml v0.2.0/go.mod h1:PfjvVjr5PG7I0Gg2PbvH7ohS4aMh8SH0QwJgTD1L2K8=

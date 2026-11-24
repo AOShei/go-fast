@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+- **Web feeds** (go-fast-xml v0.2.0, after v0.1.0): RSS 0.91 to 2.0,
+  RSS 1.0 and Atom 1.0 are read with go-fast-xml's new `feed` profile,
+  each item a section with its title as a heading. The HTML an item
+  holds (an RSS `description` or `content:encoded`, Atom `type="html"`
+  or `"xhtml"`) is handed to the child reader and read by go-fast-html,
+  so a feed is one document with an HTML document for each piece of HTML;
+  before, that HTML was literal markup in the feed's text. `.rss` and
+  `.atom` names now go to go-fast-xml, and a directory stands for them.
+- go-fast-xml v0.2.0 also no longer counts, in
+  `xml.unmapped_attributes`, the attributes that are in the output as
+  notes.
+- **Checked against v0.1.1 on the public corpus:** every change is in
+  XML. 76 of the 76 dev feeds are read with the `feed` profile and give
+  3,280 HTML children; all 3,356 documents pass `Validate`. In 87 other
+  dev XML files only the `xml.unmapped_attributes` warning changes (16
+  lose it). Held-out files, compared by hash: 64 change, all XML (24
+  feeds).
+
 ## v0.1.1 (2026-11-24)
 
 Pins go-fast-ooxml v0.5.0 (after v0.4.0) and adds go-fast-msbin v0.1.3;

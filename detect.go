@@ -66,7 +66,7 @@ var byExtension = map[string]Kind{
 	".yaml": {LibHTML, "yaml"}, ".yml": {LibHTML, "yaml"},
 
 	".xml": {LibXML, ""}, ".dita": {LibXML, ""}, ".ditamap": {LibXML, ""}, ".docbook": {LibXML, ""},
-	".tei": {LibXML, ""},
+	".tei": {LibXML, ""}, ".rss": {LibXML, ""}, ".atom": {LibXML, ""},
 
 	".zip": {LibArchive, "zip"}, ".tar": {LibArchive, "tar"}, ".tgz": {LibArchive, "gzip"}, ".gz": {LibArchive, "gzip"},
 }
