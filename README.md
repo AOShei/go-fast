@@ -2,7 +2,7 @@
 
 The front door of the go-fast libraries. It reads a file of any of their formats by sending it to the library that reads it, opens zip, tar and gzip archives, and reads many files in parallel. Everything comes out in the shared document model, `gofastcore.Document` (`github.com/AOShei/go-fast-core`).
 
-**Status: v0.1.0 (2026-11-24).** The changes are in [`CHANGELOG.md`](CHANGELOG.md).
+**Status: v0.1.1 (2026-11-24).** The changes are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ```
 go install github.com/AOShei/go-fast/cmd/gofast@latest
@@ -137,7 +137,6 @@ The go-fast libraries never import each other; this module imports them all. It 
 
 ## Not read yet
 
-- Office 97–2003 files (`.doc`, `.xls`, `.ppt`).
 - Objects embedded through OLE: an Office 2007 file wrapped in an OLE object (as RTF and older Office files embed one), and a PDF wrapped in one. They are listed as unsupported.
 - Images, audio and video. The series reads no text from pixels or sound.
 - zip members compressed with methods other than stored and deflated, and encrypted zip members.
