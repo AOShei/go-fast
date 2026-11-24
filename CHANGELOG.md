@@ -28,6 +28,13 @@ and archives.
   (counted under `-max-memory-bytes`); a larger one is read with
   `compress/gzip`. The same output as before; a `.tar.gz` cut short is
   reported as `inflate: the data ends early`, not `unexpected EOF`.
+- **A zip cut short is read** by its members' own headers, with
+  go-fast-core's `ziprecover` (go-fast-core v0.1.6): the members found are
+  read, the one the file ends inside is reported as not read, and the
+  archive is reported damaged, with how many members were found. Before,
+  such an archive was not read at all. On a zip of 150 ODT files and 150
+  messages cut before its directory, the 300 documents are byte-identical
+  to the whole archive's.
 - **JSON and YAML** (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`,
   `.yml`, and their media types) go to go-fast-html, as text; never by
   content.
@@ -36,7 +43,7 @@ and archives.
   go-fast-email for text in messages, and used for a file go-fast-html
   refuses with `ErrEncodingUnknown`; never before, so it does not override
   a `<meta>`.
-- Pins: go-fast-core v0.1.5 (the comparisons below were made with
+- Pins: go-fast-core v0.1.6 (the comparisons below were made with
   v0.1.2), go-fast-pdf v0.3.0, go-fast-ooxml v0.3.0,
   go-fast-odf v0.2.0, go-fast-rtf v0.2.0, go-fast-email v0.2.0,
   go-fast-html v0.3.0. Over the 6,644 documents of the public corpus and
