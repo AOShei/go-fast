@@ -111,6 +111,8 @@ var byMIME = map[string]Kind{
 	"text/x-yaml": {LibHTML, "yaml"},
 
 	"application/xml": {LibXML, ""}, "text/xml": {LibXML, ""},
+	// Tika's names for Office 2003's XML formats.
+	"application/vnd.ms-wordml": {LibOOXML, ""}, "application/vnd.ms-spreadsheetml": {LibOOXML, ""},
 
 	"application/zip": {LibArchive, "zip"}, "application/x-zip-compressed": {LibArchive, "zip"},
 	"application/x-tar": {LibArchive, "tar"},
@@ -145,9 +147,24 @@ const sniffBytes = 4096
 //   - anything else is what go-fast-html's Detect says of it: HTML when
 //     it is markup, else plain text.
 //
+// Whatever decides that an input is go-fast-xml's (its media type, its
+// name or its bytes), an Office document saved as one XML file is
+// go-fast-ooxml's: Flat OPC (pkg:package), Word 2003's XML document
+// (w:wordDocument) and Excel 2003's XML spreadsheet (Workbook), by the
+// root element and its namespace, within the first 64 KiB.
+//
 // A name whose extension is an Office 97-2003 format (.doc, .xls, .ppt and
 // their templates) gives the zero Kind: no library reads those yet.
 func Detect(name, mimeType string, r io.ReaderAt, size int64) Kind {
+	k := detect(name, mimeType, r, size)
+	if k.Library == LibXML && officeXML(r, size) {
+		return Kind{LibOOXML, ""}
+	}
+	return k
+}
+
+// detect is Detect but for Office documents saved as XML.
+func detect(name, mimeType string, r io.ReaderAt, size int64) Kind {
 	t := mediaType(mimeType)
 	if k, ok := byMIME[t]; ok && !generic[t] {
 		return k
