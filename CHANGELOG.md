@@ -1,6 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## v0.1.1 (2026-11-24)
+
+Pins go-fast-ooxml v0.5.0 (after v0.4.0) and adds go-fast-msbin v0.1.3;
+the other libraries and go-fast-core v0.1.6 are as in v0.1.0.
 
 - **Office documents saved as XML are read by go-fast-ooxml** (v0.5.0,
   after v0.4.0): Flat OPC (`pkg:package`, read as `docx`, `xlsx` or
