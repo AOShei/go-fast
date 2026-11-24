@@ -43,6 +43,16 @@ type Extractor struct {
 	// <meta> or an XML declaration. Empty means none: such input is
 	// refused, and a message's text keeps U+FFFD.
 	Charset string
+	// XMLProfiles are go-fast-xml profiles (gofastxml.LoadProfile reads
+	// one) tried, in order, before its built-in ones. Each is chosen by
+	// the root element as they are, so they can be given for a batch of
+	// any formats. A loaded profile is safe to share.
+	XMLProfiles []*gofastxml.Profile
+	// XMLAttributes decides, for XML read generically (no profile fits),
+	// whether each attribute is a note: gofastxml.AttributesNotes, the
+	// default, or gofastxml.AttributesNone, for data-style XML whose
+	// attributes are keys and codes.
+	XMLAttributes gofastxml.Attributes
 }
 
 // Formats lists the formats Extract reads: those of every library, and
@@ -115,7 +125,7 @@ func (e *Extractor) ExtractKind(ctx context.Context, k Kind, mimeType string, r 
 		// only a declared media type's; e.Charset is tried when the
 		// encoding is not read (go-fast-xml gives ErrUnsupported only
 		// for an encoding).
-		x := &gofastxml.Extractor{Charset: param(mimeType, "charset")}
+		x := &gofastxml.Extractor{Charset: param(mimeType, "charset"), Profiles: e.XMLProfiles, Attributes: e.XMLAttributes}
 		doc, err := x.Extract(ctx, r, size, opts)
 		if errors.Is(err, gofastcore.ErrUnsupported) && e.Charset != "" && !strings.EqualFold(x.Charset, e.Charset) {
 			x.Charset = e.Charset

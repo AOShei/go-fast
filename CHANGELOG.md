@@ -23,6 +23,12 @@ and archives.
   EPUB's manifest items of an XML type outside its reading order (a page
   map, media overlays) were read as HTML and are now read by go-fast-xml.
   `-charset` is tried for XML whose encoding go-fast-xml does not read.
+  `-xml-profile FILE` (`Extractor.XMLProfiles`) adds the caller's
+  profiles, tried before the built-in ones and chosen by the root element
+  as they are; `-xml-attributes=false` (`Extractor.XMLAttributes`) leaves
+  out the attribute notes of generic reading. Forcing one profile on
+  every XML file, as `gofastxml -profile` does, is left out: in a batch
+  of mixed files it would misread the others.
   Through the umbrella, the 4,587 XML files of the public corpus's dev
   set give the same JSON as `gofastxml`, with and without `-spans`; named
   without an extension, 4,584 are detected as XML by their bytes, and 3

@@ -301,3 +301,64 @@ func TestCharsetFlag(t *testing.T) {
 		t.Errorf("with -charset: %d %q %s", status, out, errs)
 	}
 }
+
+// TestXMLFlags: -xml-profile adds a profile chosen by the root element, a
+// bad one stops the command, and -xml-attributes=false leaves the
+// attribute notes of generic reading out.
+func TestXMLFlags(t *testing.T) {
+	dir := t.TempDir()
+	prof := filepath.Join(dir, "memo.json")
+	os.WriteFile(prof, []byte(`{"profile": "memo", "title": "Memos", "format": 1, "match": [{"root": "memo"}],
+  "rules": [{"match": "subject", "as": "heading", "level": 1}, {"match": "line", "as": "block", "kind": "paragraph"}]}`), 0o644)
+	memo := filepath.Join(dir, "a.xml")
+	os.WriteFile(memo, []byte(`<?xml version="1.0"?><memo id="m1"><subject>Budget</subject><line>Spend less.</line></memo>`), 0o644)
+	other := filepath.Join(dir, "b.xml")
+	os.WriteFile(other, []byte(`<?xml version="1.0"?><data code="X9"><v unit="kg">12</v></data>`), 0o644)
+
+	out, errs, status := runCmd(t, "", "-quiet", "-xml-profile", prof, memo, other)
+	if status != 0 {
+		t.Fatalf("%d %s", status, errs)
+	}
+	ds := docs(t, out)
+	heading := false
+	if len(ds) == 2 {
+		for _, b := range ds[0].Parts[0].Blocks {
+			heading = heading || (b.Kind == gofastcore.KindHeading && b.Text == "Budget")
+		}
+	}
+	if len(ds) != 2 || ds[0].Metadata.Extra["xml.profile"] != "memo" || !heading {
+		t.Fatalf("with the profile: %s", out)
+	}
+	if _, ok := ds[1].Metadata.Extra["xml.profile"]; ok {
+		t.Errorf("the other file took a profile: %v", ds[1].Metadata.Extra)
+	}
+	notes := func(d *gofastcore.Document) int {
+		n := 0
+		for _, p := range d.Parts {
+			for _, b := range p.Blocks {
+				if b.Kind == gofastcore.KindNote && b.Attrs["type"] == gofastcore.NoteAttribute {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	if n := notes(ds[1]); n != 2 {
+		t.Errorf("attribute notes by default: %d", n)
+	}
+	out, errs, status = runCmd(t, "", "-quiet", "-xml-attributes=false", memo, other)
+	if status != 0 {
+		t.Fatalf("%d %s", status, errs)
+	}
+	if ds := docs(t, out); len(ds) != 2 || notes(ds[1]) != 0 || !strings.Contains(ds[1].Text(), "12") {
+		t.Errorf("-xml-attributes=false: %s", out)
+	}
+	bad := filepath.Join(dir, "bad.json")
+	os.WriteFile(bad, []byte(`{"profile": `), 0o644)
+	if _, errs, status := runCmd(t, "", "-xml-profile", bad, memo); status != 2 || !strings.Contains(errs, "-xml-profile "+bad) {
+		t.Errorf("a bad profile: %d %s", status, errs)
+	}
+	if _, errs, status := runCmd(t, "", "-xml-profile", filepath.Join(dir, "missing.json"), memo); status != 2 || !strings.Contains(errs, "missing.json") {
+		t.Errorf("a missing profile: %d %s", status, errs)
+	}
+}

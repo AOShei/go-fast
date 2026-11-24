@@ -109,6 +109,8 @@ gofast [flags] file-or-directory...
 | `-cells` | the cells of spreadsheets with their types and formulas |
 | `-password` | for encrypted files |
 | `-charset LABEL` | the character set (`shift_jis`, `gbk`, `windows-1250`, ...) of text that declares none and whose set is not certain from its bytes; without it such a text file is not read, and text in a message has U+FFFD |
+| `-xml-profile FILE` | a go-fast-xml profile file (see its `PROFILE_FORMAT.md`), tried before the built-in profiles and chosen, as they are, by the root element, so it is safe in a batch of any formats; may be given more than once (`Extractor.XMLProfiles`) |
+| `-xml-attributes=false` | in XML no profile fits, leave out the note go-fast-xml makes of each attribute, for data-style XML (`Extractor.XMLAttributes`) |
 | `-max-input-bytes`, `-max-decoded-bytes`, `-max-text-bytes`, `-max-depth` | core's limits (`gofastcore.Limits`), for every document; `-max-input-bytes` also bounds standard input and pipes |
 | `-max-member-bytes`, `-max-archive-bytes`, `-max-memory-bytes` | the archive bounds above |
 | `-quiet` | say nothing about files that were read |

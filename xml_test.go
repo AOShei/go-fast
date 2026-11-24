@@ -141,3 +141,27 @@ func TestXMLCharset(t *testing.T) {
 		t.Errorf("declared: %v %q", err, doc.Text())
 	}
 }
+
+// TestXMLOptions: XMLProfiles and XMLAttributes reach XML read anywhere,
+// a member of an archive too.
+func TestXMLOptions(t *testing.T) {
+	p, err := gofastxml.LoadProfile(strings.NewReader(`{"profile": "memo", "title": "Memos", "format": 1, "match": [{"root": "memo"}],
+  "rules": [{"match": "subject", "as": "heading", "level": 1}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	z := zipOf(t, file{name: "m.xml", body: `<memo><subject>Budget</subject></memo>`}, file{name: "d.xml", body: `<?xml version="1.0"?><data code="X9">12</data>`})
+	e := &Extractor{XMLProfiles: []*gofastxml.Profile{p}, XMLAttributes: gofastxml.AttributesNone}
+	doc, err := e.Extract(context.Background(), bytes.NewReader(z), int64(len(z)), &gofastcore.Options{Name: "x.zip"})
+	if err != nil || len(doc.Children) != 2 {
+		t.Fatalf("%v", err)
+	}
+	if m := doc.Children[0]; m.Metadata.Extra["xml.profile"] != "memo" {
+		t.Errorf("profile: %v", m.Metadata.Extra)
+	}
+	for _, b := range doc.Children[1].Parts[0].Blocks {
+		if b.Kind == gofastcore.KindNote {
+			t.Errorf("attribute note with AttributesNone: %+v", b)
+		}
+	}
+}
