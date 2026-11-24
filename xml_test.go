@@ -33,6 +33,8 @@ func TestDetectXML(t *testing.T) {
 		{"map.ditamap", "", nil, xml},
 		{"book.docbook", "", nil, xml},
 		{"text.tei", "", nil, xml},
+		{"news.rss", "", nil, xml},
+		{"News.ATOM", "", nil, xml},
 		{"x", "application/xml", nil, xml},
 		{"x", "text/xml; charset=iso-8859-1", nil, xml},
 		{"x", "application/atom+xml", nil, xml},
@@ -162,6 +164,41 @@ func TestXMLOptions(t *testing.T) {
 	for _, b := range doc.Children[1].Parts[0].Blocks {
 		if b.Kind == gofastcore.KindNote {
 			t.Errorf("attribute note with AttributesNone: %+v", b)
+		}
+	}
+}
+
+// TestFeedChildren: an RSS or Atom feed is one XML document, read with
+// go-fast-xml's feed profile, whose items' HTML is handed to the child
+// reader and read by go-fast-html.
+func TestFeedChildren(t *testing.T) {
+	rss := `<?xml version="1.0"?><rss version="2.0"><channel><title>News</title>
+<item><title>First</title><guid>a1</guid><description>&lt;p&gt;Hello &lt;b&gt;world&lt;/b&gt;&lt;/p&gt;</description></item>
+<item><title>Second</title><description>Plain text only</description></item>
+</channel></rss>`
+	atom := `<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Log</title>
+<entry><title>Entry</title><id>urn:e1</id><content type="html">&lt;p&gt;Atom &lt;i&gt;body&lt;/i&gt;&lt;/p&gt;</content></entry></feed>`
+	for _, c := range []struct{ name, body, text string }{
+		{"news.rss", rss, "Hello world"},
+		{"", rss, "Hello world"},
+		{"log.atom", atom, "Atom body"},
+	} {
+		doc, err := extractNamed(&Extractor{}, c.name, c.body)
+		if err != nil {
+			t.Fatalf("%q: %v", c.name, err)
+		}
+		if doc.Source.Format != "xml" || doc.Metadata.Extra["xml.profile"] != "feed" {
+			t.Errorf("%q: format %q, profile %q", c.name, doc.Source.Format, doc.Metadata.Extra["xml.profile"])
+		}
+		if len(doc.Children) != 1 {
+			t.Fatalf("%q: %d children, want 1", c.name, len(doc.Children))
+		}
+		child := doc.Children[0]
+		if child.Source.Format != "html" || !strings.Contains(child.Text(), c.text) || strings.Contains(child.Text(), "<p>") {
+			t.Errorf("%q: child %q %q", c.name, child.Source.Format, child.Text())
+		}
+		if strings.Contains(doc.Text(), "<b>") || strings.Contains(doc.Text(), "&lt;") {
+			t.Errorf("%q: markup left in the feed's text: %q", c.name, doc.Text())
 		}
 	}
 }

@@ -22,7 +22,7 @@ gofast -format markdown notes.docx       # one document as Markdown
 | RTF | [go-fast-rtf](https://github.com/AOShei/go-fast-rtf) |
 | Email: `.eml`, `.mbox`, Outlook `.msg`, TNEF (`winmail.dat`) | [go-fast-email](https://github.com/AOShei/go-fast-email) |
 | HTML, Markdown, plain text, EPUB, CSV, TSV, Jupyter notebooks, JSON and YAML (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`, `.yml`; as text, never by content) | [go-fast-html](https://github.com/AOShei/go-fast-html) |
-| XML of any schema (`.xml`, `.dita`, `.ditamap`, `.docbook`, `.tei`), with built-in profiles for Akoma Ntoso, HL7 CDA, CLML, DITA, DocBook, Formex, JATS, Légifrance, patents, S1000D, Service-Public and TEI | [go-fast-xml](https://github.com/AOShei/go-fast-xml) |
+| XML of any schema (`.xml`, `.dita`, `.ditamap`, `.docbook`, `.tei`, `.rss`, `.atom`), with built-in profiles for Akoma Ntoso, HL7 CDA, CLML, DITA, DocBook, Formex, JATS, Légifrance, patents, S1000D, Service-Public, TEI and web feeds (RSS, Atom). A feed is one document, and the HTML of its items is read by go-fast-html as its child documents | [go-fast-xml](https://github.com/AOShei/go-fast-xml) |
 | zip, tar, gzip (`.tar.gz`, `.tgz`, `.gz`) | this module |
 
 **How the format is decided** (`Detect`):
