@@ -22,6 +22,12 @@ and archives.
   zip members larger than their compressed size allows are not read;
   member names are cleaned, and `-dir` writes nothing outside its
   directory, with names every system can create.
+- **Decompression with go-fast-core's `inflate`**, about twice as fast
+  as the standard library: zip members, and `.gz` and `.tar.gz` files of
+  up to 1 GiB, which are read into memory and held while they are walked
+  (counted under `-max-memory-bytes`); a larger one is read with
+  `compress/gzip`. The same output as before; a `.tar.gz` cut short is
+  reported as `inflate: the data ends early`, not `unexpected EOF`.
 - **JSON and YAML** (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`,
   `.yml`, and their media types) go to go-fast-html, as text; never by
   content.

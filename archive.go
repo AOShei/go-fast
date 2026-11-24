@@ -38,8 +38,11 @@ const (
 )
 
 // maxGzipHeld bounds a gzip file that is read into memory to be
-// decompressed with inflate; a larger one is read with compress/gzip.
-const maxGzipHeld = 64 << 20
+// decompressed with inflate, about twice as fast as compress/gzip, which
+// reads a larger one. It is held while the file is walked, and counted
+// by WalkOptions.Hold as a member is. A gzip file inside an archive is in
+// memory already, and is decompressed with inflate whatever its size.
+const maxGzipHeld = 1 << 30
 
 // deflateRatio bounds how many bytes deflate can make of one: 1,032 at
 // most. A member said to be larger than its compressed size allows is
@@ -341,11 +344,24 @@ func (w *archiveWalker) walkGzip(r io.ReaderAt, size int64, name string, fn func
 		return fmt.Errorf("gofast: gzip: %v: %w", err, ErrArchive)
 	}
 	defer zr.Close()
+	// zr has read the header, for the name. The data is decompressed
+	// with go-fast-core's inflate when it is in memory, or small enough
+	// to be read into it (maxGzipHeld).
 	var stream io.Reader = zr
-	if size <= maxGzipHeld {
-		// A file small enough to hold is read with go-fast-core's
-		// inflate, about twice as fast as compress/gzip; zr has read
-		// its header, for the name.
+	if b, ok := r.(bytesReaderAt); ok && int64(len(b)) >= size {
+		stream = inflate.NewGzipReader(b[:size], 1<<62)
+	} else if size <= maxGzipHeld {
+		if w.hold != nil {
+			release, err := w.hold(size, w.own)
+			if err != nil {
+				return fmt.Errorf("%w: %w", errHold, err)
+			}
+			defer release()
+		}
+		// The walk holds it until it is out of the file: what it
+		// waits for must not wait for this.
+		w.own += size
+		defer func() { w.own -= size }()
 		src := make([]byte, size)
 		if n, _ := r.ReadAt(src, 0); int64(n) == size {
 			stream = inflate.NewGzipReader(src, 1<<62)
@@ -516,7 +532,8 @@ type WalkOptions struct {
 	// 1 opens none. Zero means gofastcore.DefaultMaxDepth.
 	MaxDepth int
 	// Hold, when not nil, is called with the number of bytes a member
-	// will take in memory before they are read, and with own, the bytes
+	// (or a gzip file read into memory to be decompressed) will take in
+	// memory before they are read, and with own, the bytes
 	// the walk itself holds at the moment (the archives it is inside,
 	// which it cannot give back before it is out of them). It returns
 	// the function that gives the bytes back (part of Member.Release).

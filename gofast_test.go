@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -281,6 +282,45 @@ func TestHoldNested(t *testing.T) {
 	// Holding n.txt.gz's member, the walk is inside n.txt.gz.
 	if len(owns) != 3 || owns[0] != 0 || owns[2] == 0 {
 		t.Errorf("own: %v", owns)
+	}
+}
+
+// TestHoldGzip: a gzip file read into memory to be decompressed is held
+// while it is walked, and the walk counts it as its own, so that its
+// members do not wait for it.
+func TestHoldGzip(t *testing.T) {
+	b := gz(tarOf(t, file{name: "a.txt", body: strings.Repeat("a", 3000)}, file{name: "b.txt", body: "b"}), "")
+	held := int64(0)
+	type call struct{ n, own int64 }
+	var calls []call
+	hold := func(n, own int64) (func(), error) {
+		calls = append(calls, call{n, own})
+		held += n
+		return func() { held -= n }, nil
+	}
+	var pending []Member
+	err := (&Extractor{}).Walk(context.Background(), Kind{LibArchive, "gzip"}, "h.tar.gz", bytes.NewReader(b), int64(len(b)),
+		WalkOptions{Hold: hold}, func(m Member) error { pending = append(pending, m); return nil }, func(s Skipped) { t.Errorf("skipped %+v", s) })
+	if err != nil || len(pending) != 2 {
+		t.Fatalf("%v %+v", err, pending)
+	}
+	size := int64(len(b))
+	if len(calls) != 3 || calls[0] != (call{size, 0}) || calls[1] != (call{3000, size}) || calls[2] != (call{1, size}) {
+		t.Errorf("calls %v", calls)
+	}
+	// The file is given back when the walk is out of it; the members are
+	// copies of its output.
+	if held != 3001 {
+		t.Errorf("held %d after the walk", held)
+	}
+	if got, _ := io.ReadAll(io.NewSectionReader(pending[0].R, 0, pending[0].Size)); string(got) != strings.Repeat("a", 3000) {
+		t.Errorf("a.txt: %q", got)
+	}
+	for _, m := range pending {
+		m.Release()
+	}
+	if held != 0 {
+		t.Errorf("held %d after all released", held)
 	}
 }
 
