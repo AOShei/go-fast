@@ -105,8 +105,8 @@ func TestDetect(t *testing.T) {
 		{"x", "application/json; charset=utf-8", nil, Kind{LibHTML, "json"}},
 		{"conf.yml", "", nil, Kind{LibHTML, "yaml"}},
 		{"x", "application/yaml", nil, Kind{LibHTML, "yaml"}},
-		{"noext", "", []byte(`{"a": 1}`), Kind{LibHTML, "txt"}}, // never by content
-		{"old.doc", "", []byte("\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"), Kind{}},
+		{"noext", "", []byte(`{"a": 1}`), Kind{LibHTML, "txt"}},                         // never by content
+		{"old.doc", "", []byte("\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"), Kind{LibEmail, ""}}, // no directory to read: see TestLegacyExtract
 		{"photo.jpg", "", []byte("\xFF\xD8\xFF\xE0\x00\x10JFIF\x00"), Kind{}},
 		{"noext", "", []byte("\xFF\xFEa\x00b\x00"), Kind{LibHTML, "txt"}},
 		{"empty", "", nil, Kind{LibHTML, "txt"}},
@@ -532,10 +532,12 @@ func TestExtractArchive(t *testing.T) {
 }
 
 func TestExtractUnsupported(t *testing.T) {
-	for _, name := range []string{"old.doc", "photo.jpg"} {
+	// A compound file cut short: named as Office, go-fast-msbin says it is
+	// cut (malformed); named otherwise, nothing reads it.
+	for name, want := range map[string]error{"old.doc": gofastcore.ErrMalformed, "photo.jpg": gofastcore.ErrUnsupported} {
 		body := "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1\x00\x00"
-		if _, err := (&Extractor{}).Extract(context.Background(), strings.NewReader(body), int64(len(body)), &gofastcore.Options{Name: name}); !errors.Is(err, gofastcore.ErrUnsupported) {
-			t.Errorf("%s: %v", name, err)
+		if _, err := (&Extractor{}).Extract(context.Background(), strings.NewReader(body), int64(len(body)), &gofastcore.Options{Name: name}); !errors.Is(err, want) {
+			t.Errorf("%s: %v, want %v", name, err, want)
 		}
 	}
 }
@@ -579,6 +581,8 @@ func FuzzDetect(f *testing.F) {
 	f.Add("", "", []byte("<?xml version=\"1.0\"?><!DOCTYPE a [<!ENTITY b \"]>\">]><!-- c --><a xmlns='u'/>"))
 	f.Add("", "application/atom+xml", []byte("\xFF\xFE<\x00?\x00x\x00m\x00l\x00 \x00"))
 	f.Add("b.xml", "", []byte(spreadsheetML))
+	f.Add("a.doc", "", compound("WordDocument", "1Table"))
+	f.Add("", "application/vnd.ms-excel", compound("Workbook")[:700])
 	f.Add("", "text/xml", []byte(`<?xml version="1.0"?><p:package xmlns:p='http://schemas.microsoft.com/office/2006/xmlPackage' xmlns:q="x"/>`))
 	f.Add("d.xml", "", []byte("<\x00w\x00:\x00w\x00"))
 	f.Fuzz(func(t *testing.T, name, mimeType string, b []byte) {

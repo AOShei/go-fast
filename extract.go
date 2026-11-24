@@ -11,6 +11,7 @@ import (
 	gofastcore "github.com/AOShei/go-fast-core"
 	gofastemail "github.com/AOShei/go-fast-email"
 	gofasthtml "github.com/AOShei/go-fast-html"
+	gofastmsbin "github.com/AOShei/go-fast-msbin"
 	gofastodf "github.com/AOShei/go-fast-odf"
 	gofastooxml "github.com/AOShei/go-fast-ooxml"
 	gofastpdf "github.com/AOShei/go-fast-pdf"
@@ -61,6 +62,7 @@ func (e *Extractor) Formats() []string {
 	var out []string
 	out = append(out, (&gofastpdf.Extractor{}).Formats()...)
 	out = append(out, (&gofastooxml.Extractor{}).Formats()...)
+	out = append(out, (&gofastmsbin.Extractor{}).Formats()...)
 	out = append(out, (&gofastodf.Extractor{}).Formats()...)
 	out = append(out, (&gofastrtf.Extractor{}).Formats()...)
 	out = append(out, (&gofastemail.Extractor{}).Formats()...)
@@ -100,6 +102,8 @@ func (e *Extractor) ExtractKind(ctx context.Context, k Kind, mimeType string, r 
 		return (&gofastpdf.Extractor{}).Extract(ctx, r, size, opts)
 	case LibOOXML:
 		return (&gofastooxml.Extractor{}).Extract(ctx, r, size, opts)
+	case LibMSBin:
+		return (&gofastmsbin.Extractor{}).Extract(ctx, r, size, opts)
 	case LibODF:
 		return (&gofastodf.Extractor{}).Extract(ctx, r, size, opts)
 	case LibRTF:
@@ -108,7 +112,13 @@ func (e *Extractor) ExtractKind(ctx context.Context, k Kind, mimeType string, r 
 		doc, err := (&gofastemail.Extractor{Charset: e.Charset}).Extract(ctx, r, size, opts)
 		if err != nil && opts != nil && isCompoundFile(r) && !strings.EqualFold(pathExt(opts.Name), ".msg") &&
 			(errors.Is(err, gofastcore.ErrMalformed) || errors.Is(err, gofastcore.ErrUnsupported)) {
-			return nil, fmt.Errorf("gofast: an OLE compound file that is not an Outlook message (Office 97-2003 files are not read yet): %w", gofastcore.ErrUnsupported)
+			if legacyOffice[strings.ToLower(pathExt(opts.Name))] {
+				// Named as Office, with a directory go-fast-msbin's
+				// Detect did not name (damaged, or of an older
+				// generation): go-fast-msbin says what it is.
+				return (&gofastmsbin.Extractor{}).Extract(ctx, r, size, opts)
+			}
+			return nil, fmt.Errorf("gofast: an OLE compound file that is neither an Outlook message nor a Word, Excel or PowerPoint 97-2003 file: %w", gofastcore.ErrUnsupported)
 		}
 		return doc, err
 	case LibHTML:
@@ -138,9 +148,6 @@ func (e *Extractor) ExtractKind(ctx context.Context, k Kind, mimeType string, r 
 	name := ""
 	if opts != nil {
 		name = opts.Name
-	}
-	if legacyOffice[strings.ToLower(pathExt(name))] {
-		return nil, fmt.Errorf("gofast: %s: Office 97-2003 files are not read yet: %w", name, gofastcore.ErrUnsupported)
 	}
 	return nil, fmt.Errorf("gofast: no library reads %q: %w", name, gofastcore.ErrUnsupported)
 }

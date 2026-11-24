@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	gofasthtml "github.com/AOShei/go-fast-html"
+	gofastmsbin "github.com/AOShei/go-fast-msbin"
 )
 
 // The libraries an input can be routed to, and the archive formats this
@@ -16,6 +17,7 @@ import (
 const (
 	LibPDF   = "pdf"   // go-fast-pdf
 	LibOOXML = "ooxml" // go-fast-ooxml: Word, Excel and PowerPoint 2007 and later
+	LibMSBin = "msbin" // go-fast-msbin: Word, Excel and PowerPoint 97-2003
 	LibODF   = "odf"   // go-fast-odf: OpenDocument
 	LibRTF   = "rtf"   // go-fast-rtf
 	LibEmail = "email" // go-fast-email: eml, mbox, msg, TNEF
@@ -133,7 +135,11 @@ const sniffBytes = 4096
 //     OpenDocument or EPUB if its mimetype member says so, and otherwise
 //     an archive;
 //   - gzip and tar (ustar) are archives;
-//   - "{\rtf" is RTF; an OLE compound file, a TNEF stream, a mailbox's
+//   - "{\rtf" is RTF;
+//   - an OLE compound file is go-fast-msbin's when its directory holds
+//     the streams of a Word, Excel or PowerPoint 97-2003 file
+//     (go-fast-msbin's Detect), and otherwise email;
+//   - a TNEF stream, a mailbox's
 //     "From " line (an address, then a date with a time) or a message's
 //     header lines (at least two of the headers messages have, one of
 //     them From, Received, Return-Path, Message-ID, MIME-Version or
@@ -154,7 +160,8 @@ const sniffBytes = 4096
 // root element and its namespace, within the first 64 KiB.
 //
 // A name whose extension is an Office 97-2003 format (.doc, .xls, .ppt and
-// their templates) gives the zero Kind: no library reads those yet.
+// their templates and shows), or one of their media types, is decided by
+// the bytes: see legacy.
 func Detect(name, mimeType string, r io.ReaderAt, size int64) Kind {
 	k := detect(name, mimeType, r, size)
 	if k.Library == LibXML && officeXML(r, size) {
@@ -172,6 +179,9 @@ func detect(name, mimeType string, r io.ReaderAt, size int64) Kind {
 	if strings.HasSuffix(t, "+xml") && !xmlToHTML[t] {
 		return Kind{LibXML, ""}
 	}
+	if legacyMIME[t] {
+		return legacy(name, r, size)
+	}
 	ext := strings.ToLower(path.Ext(name))
 	if strings.HasSuffix(strings.ToLower(name), ".tar.gz") {
 		return Kind{LibArchive, "gzip"}
@@ -180,7 +190,7 @@ func detect(name, mimeType string, r io.ReaderAt, size int64) Kind {
 		return k
 	}
 	if legacyOffice[ext] {
-		return Kind{}
+		return legacy(name, r, size)
 	}
 	if strings.EqualFold(path.Base(name), "winmail.dat") {
 		return Kind{LibEmail, ""}
@@ -209,14 +219,37 @@ var legacyOffice = map[string]bool{
 	".ppt": true, ".pps": true, ".pot": true,
 }
 
+// legacyMIME are the media types of the Office 97-2003 formats.
+var legacyMIME = map[string]bool{
+	"application/msword": true, "application/vnd.ms-excel": true, "application/vnd.ms-powerpoint": true,
+}
+
+// legacy decides an input whose name or media type says it is an Office
+// 97-2003 file, by its bytes. A compound file is go-fast-msbin's when
+// go-fast-msbin's Detect names its format, as sniff decides. Other bytes
+// go where they say: RTF or HTML saved as .doc, a zip named .xls (such
+// files are common). Bytes that no library reads, and no bytes, are
+// go-fast-msbin's, which says what the file is (an Excel 2 to 4 workbook,
+// a Word 2 document).
+func legacy(name string, r io.ReaderAt, size int64) Kind {
+	if r == nil || size <= 0 {
+		return Kind{LibMSBin, ""}
+	}
+	if k := sniff(name, r, size); k.Library != "" {
+		return k
+	}
+	return Kind{LibMSBin, ""}
+}
+
 // KnownExtension reports whether a name's extension is one Detect routes
 // to a library or an archive: the files a directory stands for.
 func KnownExtension(name string) bool {
 	if strings.HasSuffix(strings.ToLower(name), ".tar.gz") {
 		return true
 	}
-	_, ok := byExtension[strings.ToLower(path.Ext(name))]
-	return ok
+	ext := strings.ToLower(path.Ext(name))
+	_, ok := byExtension[ext]
+	return ok || legacyOffice[ext]
 }
 
 // sniff decides from the bytes.
@@ -239,8 +272,13 @@ func sniff(name string, r io.ReaderAt, size int64) Kind {
 	case bytes.HasPrefix(head, []byte(`{\rtf`)):
 		return Kind{LibRTF, ""}
 	case bytes.HasPrefix(head, []byte("\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1")):
-		// An OLE compound file: an Outlook message is the one this
-		// series reads; go-fast-email refuses another.
+		// An OLE compound file: a Word, Excel or PowerPoint 97-2003
+		// file, by the streams go-fast-msbin's Detect finds in its
+		// directory, or an Outlook message; go-fast-email refuses
+		// another.
+		if f := gofastmsbin.Detect(r, size); f != "" {
+			return Kind{LibMSBin, f}
+		}
 		return Kind{LibEmail, ""}
 	case bytes.HasPrefix(head, []byte{0x78, 0x9f, 0x3e, 0x22}): // TNEF
 		return Kind{LibEmail, ""}

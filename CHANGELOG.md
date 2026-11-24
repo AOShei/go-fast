@@ -13,6 +13,32 @@
   headings or cell formats). XML with a document type declaration stays
   with go-fast-xml. `application/vnd.ms-wordml` and
   `application/vnd.ms-spreadsheetml` go to go-fast-ooxml.
+- **Word, Excel and PowerPoint 97-2003 files are read by go-fast-msbin**
+  (v0.1.3): `.doc`, `.dot`, `.xls`, `.xlt`, `.xla`, `.ppt`, `.pps`,
+  `.pot`, `application/msword`, `application/vnd.ms-excel` and
+  `application/vnd.ms-powerpoint`, and any OLE compound file whose
+  directory go-fast-msbin's `Detect` names, whatever its name; other
+  compound files go to go-fast-email as before. A file named or declared
+  as one of these is decided by its bytes: RTF, HTML or XML saved as
+  `.doc` or `.xls`, and a zip named `.xls`, are read by the library for
+  those bytes. Bytes no library reads go to go-fast-msbin, which names
+  what they are. Attachments and embedded objects follow: Word, Excel
+  and PowerPoint files attached to messages or embedded in RTF are now
+  read. A directory now stands for these files too. Before, they were
+  refused ("Office 97-2003 files are not read yet").
+- **Checked against go-fast-msbin's corpus** (2,528 files): every file
+  `gofastmsbin` reads gives the same document through `gofast`, apart
+  from embedded documents, which `gofast` reads more of. Through
+  `gofast`, 12 files that `gofastmsbin` refuses are read by their
+  bytes: Excel and Word 2003 XML saved as `.xls` and `.doc` (3),
+  Graphviz `.dot` files (3), JSON and text named `.doc` (2), `.xlsx` and
+  `.docx` files named `.xls` and `.doc` (3), and a zip of XML files
+  named `.xls` (1). Held-out files were
+  compared by hash and format only. In the public corpus, 3 documents
+  change: two messages with an attached `.doc`, and an RTF file with
+  embedded Word, Excel and PowerPoint objects. A fourth changes only in
+  the wording of the error for an embedded OLE object that is no
+  Office file.
 - **Checked:** the 42 such files of go-fast-ooxml's soak set give, through
   `gofast`, what `gofastooxml` gives (in one, only the wording of errors
   for embedded Office 97-2003 files, which the umbrella reads itself).
