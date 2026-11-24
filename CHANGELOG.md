@@ -44,9 +44,30 @@ and archives.
   refuses with `ErrEncodingUnknown`; never before, so it does not override
   a `<meta>`.
 - Pins: go-fast-core v0.1.6 (the comparisons below were made with
-  v0.1.2), go-fast-pdf v0.3.0, go-fast-ooxml v0.3.0,
-  go-fast-odf v0.2.0, go-fast-rtf v0.2.0, go-fast-email v0.2.0,
-  go-fast-html v0.3.0. Over the 6,644 documents of the public corpus and
+  v0.1.2), go-fast-pdf v0.3.0, go-fast-ooxml v0.4.0,
+  go-fast-odf v0.2.2, go-fast-rtf v0.2.1, go-fast-email v0.2.1,
+  go-fast-html v0.4.4. Against go-fast-odf v0.2.0, -rtf v0.2.0, -email
+  v0.2.0 and -html v0.3.0, over the 22,421 ODF, RTF, email and HTML
+  documents of the benchmark set and the 506 the command reads of the
+  public corpus, with default flags and with `-cells -spans -images data`,
+  36 documents differ, all by go-fast-html v0.4's encodings: 20 pages and
+  a KOI8-R message that were read as windows-1252 are decoded (ISO-8859-6,
+  EUC-JP, ISO-8859-2 and others); 15 pages declare their encoding past
+  the first 1024 bytes, which is now used: 14 keep the same text and lose
+  the warning that it was recognised from their bytes, and 1 that declares
+  UTF-8 but is written in windows-1252 is read as UTF-8, as a browser
+  reads it: an HTML comment has U+FFFD where it had `ï` and `ë`, with
+  `text.unmapped_glyphs`. 3 pages refused for their encoding are read.
+  go-fast-odf, -rtf and -email give the same output.
+  go-fast-ooxml v0.4.0 (after v0.3.0) decompresses with go-fast-core's
+  `inflate`, reads a cut file with its `ziprecover`, and fixes three
+  readers that kept a view of its scanner: over 8,543 documents (its
+  corpus, fixtures and encrypted files, and the 1,980 of its batch
+  benchmark), 10 differ with default flags and 14 with `-cells -spans
+  -images data`: 4 workbooks keep shared formulas they lost, 2 Word files
+  their heading and list styles, and 8 damaged files made by fuzzers or
+  for tests give other messages or other recovered blocks.
+  Earlier, over the 6,644 documents of the public corpus and
   go-fast-ooxml's, the same files are read as with the earlier pins
   (go-fast-core v0.1.1, -pdf v0.2.1, -odf v0.1.3, -rtf v0.1.2, -email
   v0.1.3, -html v0.2.0); 12 documents differ, by the shared warning codes
