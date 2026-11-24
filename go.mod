@@ -12,4 +12,7 @@ require (
 	github.com/AOShei/go-fast-rtf v0.2.1
 )
 
-require github.com/AOShei/go-fast-xml v0.1.0
+require (
+	github.com/AOShei/go-fast-msbin v0.1.3
+	github.com/AOShei/go-fast-xml v0.1.0
+)

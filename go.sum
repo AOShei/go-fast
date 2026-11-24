@@ -4,6 +4,8 @@ github.com/AOShei/go-fast-email v0.2.1 h1:ZRjs9DHfCUVGeigi7NhJgbiVtjrSXfmtVi1LgV
 github.com/AOShei/go-fast-email v0.2.1/go.mod h1:Fs+8N6XcUdIVJJmPosHgPxp29hWKXvxygrq4C2d49Qs=
 github.com/AOShei/go-fast-html v0.4.4 h1:5EaJNe9cblqBg9EyVj7HoQ2YVwrRuXnuBBHU5F9DqJk=
 github.com/AOShei/go-fast-html v0.4.4/go.mod h1:pIU939Io9BSWSyqcw8gO78LLcmPYQAYcR8Fhn8pwNXY=
+github.com/AOShei/go-fast-msbin v0.1.3 h1:/m2+h6Y1JMtWUSjA6X92u7imdB2QaAlTbMyj2SYlCDE=
+github.com/AOShei/go-fast-msbin v0.1.3/go.mod h1:LE9qjp4FKykA1dIHrU1sZUMu1N48MVkMVpocjxjrZTU=
 github.com/AOShei/go-fast-odf v0.2.2 h1:MpH7kJCpaqpxj+fDg569mlSX4MU8CeXBU+G1dTLAbZE=
 github.com/AOShei/go-fast-odf v0.2.2/go.mod h1:en65aqf5dP9SUCM2B77pLxCEvlLaHmQeY7TsYnNmKQo=
 github.com/AOShei/go-fast-ooxml v0.5.0 h1:WjuWdIB1NdP8oWhOgEjXUDDdTzeJS0K3SRmqE00hd7M=

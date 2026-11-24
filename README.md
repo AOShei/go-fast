@@ -17,6 +17,7 @@ gofast -format markdown notes.docx       # one document as Markdown
 |---|---|
 | PDF | [go-fast-pdf](https://github.com/AOShei/go-fast-pdf) |
 | Word, Excel and PowerPoint 2007 and later (`.docx`, `.xlsx`, `.xlsb`, `.pptx` and their macro and template variants), and Office documents saved as one XML file: Flat OPC, Word 2003's XML document and Excel 2003's XML spreadsheet | [go-fast-ooxml](https://github.com/AOShei/go-fast-ooxml) |
+| Word, Excel and PowerPoint 97-2003 (`.doc`, `.xls`, `.ppt` and their templates and shows) | [go-fast-msbin](https://github.com/AOShei/go-fast-msbin) |
 | OpenDocument text, spreadsheets and presentations, and their flat XML forms | [go-fast-odf](https://github.com/AOShei/go-fast-odf) |
 | RTF | [go-fast-rtf](https://github.com/AOShei/go-fast-rtf) |
 | Email: `.eml`, `.mbox`, Outlook `.msg`, TNEF (`winmail.dat`) | [go-fast-email](https://github.com/AOShei/go-fast-email) |
@@ -32,15 +33,16 @@ gofast -format markdown notes.docx       # one document as Markdown
    - A zip archive is Office if it has `[Content_Types].xml`, OpenDocument or EPUB if its `mimetype` member says so, and otherwise an archive.
    - gzip and tar are archives.
    - `{\rtf` is RTF.
-   - An OLE compound file, a TNEF stream, a mailbox's `From ` line (an address, then a date with a time) or a message's header lines (at least two of the headers messages have, one of them `From`, `Received`, `Return-Path`, `Message-ID`, `MIME-Version` or `Delivered-To`) are email.
+   - An OLE compound file is Word, Excel or PowerPoint 97-2003 (go-fast-msbin) when its directory holds those formats' streams (go-fast-msbin's `Detect`), and otherwise email.
+   - A TNEF stream, a mailbox's `From ` line (an address, then a date with a time) or a message's header lines (at least two of the headers messages have, one of them `From`, `Received`, `Return-Path`, `Message-ID`, `MIME-Version` or `Delivered-To`) are email.
    - An OpenDocument flat XML file is OpenDocument.
    - XML is go-fast-xml's: input that begins with an XML declaration (`<?xml`), that has a document type declaration naming a root element other than `html`, or whose first element declares a namespace. A first element named `html` or `svg`, or in the XHTML or SVG namespace, stays with go-fast-html. XML with none of these marks (no declaration, no document type, no namespace) is read as HTML, unless its name or media type says XML.
-
-**Office documents saved as XML** go to go-fast-ooxml, whichever of the steps above sent them to go-fast-xml (a `.xml` name, an XML media type, or the bytes). They are known by the root element and its namespace, within the first 64 KiB, as go-fast-ooxml knows them: Flat OPC's `pkg:package` (read as `docx`, `xlsx` or `pptx`, with `extra.packaging` `flat_opc`), Word 2003's `w:wordDocument` (format `wordml`) and Excel 2003's `Workbook` (format `spreadsheetml`). XML with a document type declaration stays with go-fast-xml. The root is found in UTF-8, UTF-16 and the single- and double-byte sets Office writes (the Windows code pages, ISO 8859, Shift_JIS, GBK, EUC-KR, Big5). The media types `application/vnd.ms-wordml` and `application/vnd.ms-spreadsheetml` go to go-fast-ooxml too.
    - Binary input (images, audio, executables) is read by none.
    - Anything else is what go-fast-html makes of it: HTML when it is markup, else plain text.
 
-Office 97–2003 files (`.doc`, `.xls`, `.ppt`) are not read yet; a library for them is being written.
+**Office documents saved as XML** go to go-fast-ooxml, whichever of the steps above sent them to go-fast-xml (a `.xml` name, an XML media type, or the bytes). They are known by the root element and its namespace, within the first 64 KiB, as go-fast-ooxml knows them: Flat OPC's `pkg:package` (read as `docx`, `xlsx` or `pptx`, with `extra.packaging` `flat_opc`), Word 2003's `w:wordDocument` (format `wordml`) and Excel 2003's `Workbook` (format `spreadsheetml`). XML with a document type declaration stays with go-fast-xml. The root is found in UTF-8, UTF-16 and the single- and double-byte sets Office writes (the Windows code pages, ISO 8859, Shift_JIS, GBK, EUC-KR, Big5). The media types `application/vnd.ms-wordml` and `application/vnd.ms-spreadsheetml` go to go-fast-ooxml too.
+
+**Office 97-2003 files** are decided by their bytes even when their name (`.doc`, `.dot`, `.xls`, `.xlt`, `.xla`, `.ppt`, `.pps`, `.pot`) or media type (`application/msword`, `application/vnd.ms-excel`, `application/vnd.ms-powerpoint`) says what they are. A compound file goes to go-fast-msbin when its directory holds a Word, Excel or PowerPoint file. Other bytes go where they say: RTF, HTML or XML saved as `.doc` or `.xls`, a zip named `.xls`. Bytes no library reads (an Excel 2 to 4 workbook, a Word 2 document) go to go-fast-msbin, which says what the file is. An Outlook message named `.doc` is still a message. A compound file named as Office that go-fast-msbin's `Detect` does not name (its directory is damaged) and go-fast-email does not read gets go-fast-msbin's error.
 
 **Text that declares no character set** and is not UTF-8 is read in the set its bytes are certainly in (Shift_JIS, GBK, Big5, EUC-KR, windows-1251, windows-1252, UTF-16 without a byte order mark), with the warning `text.encoding_detected`, by go-fast-html and go-fast-email; go-fast-xml also recognises an encoding from the bytes, with the same warning. Where no set is certain, a text file is refused (`gofasthtml.ErrEncodingUnknown`, which wraps `ErrUnsupported`), XML is refused (`ErrUnsupported`) and a message's text keeps U+FFFD; `-charset` (`Extractor.Charset`) gives the set to use then. It never overrides a set the input declares: a `<meta>`, an XML declaration's `encoding` or a `charset` parameter wins.
 
