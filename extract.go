@@ -15,6 +15,7 @@ import (
 	gofastooxml "github.com/AOShei/go-fast-ooxml"
 	gofastpdf "github.com/AOShei/go-fast-pdf"
 	gofastrtf "github.com/AOShei/go-fast-rtf"
+	gofastxml "github.com/AOShei/go-fast-xml"
 )
 
 // Extractor reads any format of the go-fast libraries, and archives. The
@@ -36,9 +37,10 @@ type Extractor struct {
 	// library reading it cannot determine from its bytes. go-fast-email
 	// uses it for such text in messages (gofastemail.Extractor.Charset).
 	// HTML, Markdown, plain text, CSV, TSV, JSON and YAML that
-	// go-fast-html refuses with gofasthtml.ErrEncodingUnknown are read
-	// again in it; it is not given to go-fast-html before, since there it
-	// would override a <meta> declaration. Empty means none: such input is
+	// go-fast-html refuses with gofasthtml.ErrEncodingUnknown, and XML
+	// whose encoding go-fast-xml does not read, are read again in it; it
+	// is not given to either before, since there it would override a
+	// <meta> or an XML declaration. Empty means none: such input is
 	// refused, and a message's text keeps U+FFFD.
 	Charset string
 }
@@ -53,6 +55,7 @@ func (e *Extractor) Formats() []string {
 	out = append(out, (&gofastrtf.Extractor{}).Formats()...)
 	out = append(out, (&gofastemail.Extractor{}).Formats()...)
 	out = append(out, (&gofasthtml.Extractor{}).Formats()...)
+	out = append(out, (&gofastxml.Extractor{}).Formats()...)
 	return append(out, "zip", "tar", "gzip")
 }
 
@@ -103,6 +106,18 @@ func (e *Extractor) ExtractKind(ctx context.Context, k Kind, mimeType string, r 
 		x.Header = strings.EqualFold(param(mimeType, "header"), "present")
 		doc, err := x.Extract(ctx, r, size, opts)
 		if errors.Is(err, gofasthtml.ErrEncodingUnknown) && x.Charset == "" && e.Charset != "" {
+			x.Charset = e.Charset
+			return x.Extract(ctx, r, size, opts)
+		}
+		return doc, err
+	case LibXML:
+		// go-fast-xml's Charset overrides the XML declaration, so it gets
+		// only a declared media type's; e.Charset is tried when the
+		// encoding is not read (go-fast-xml gives ErrUnsupported only
+		// for an encoding).
+		x := &gofastxml.Extractor{Charset: param(mimeType, "charset")}
+		doc, err := x.Extract(ctx, r, size, opts)
+		if errors.Is(err, gofastcore.ErrUnsupported) && e.Charset != "" && !strings.EqualFold(x.Charset, e.Charset) {
 			x.Charset = e.Charset
 			return x.Extract(ctx, r, size, opts)
 		}

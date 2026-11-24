@@ -576,6 +576,8 @@ func FuzzDetect(f *testing.F) {
 	f.Add("x.zip", "", []byte("PK\x03\x04"))
 	f.Add("", "text/csv; header=present", []byte("a,b"))
 	f.Add("m", "", []byte("Received: x\nSubject: y\n\n"))
+	f.Add("", "", []byte("<?xml version=\"1.0\"?><!DOCTYPE a [<!ENTITY b \"]>\">]><!-- c --><a xmlns='u'/>"))
+	f.Add("", "application/atom+xml", []byte("\xFF\xFE<\x00?\x00x\x00m\x00l\x00 \x00"))
 	f.Fuzz(func(t *testing.T, name, mimeType string, b []byte) {
 		k := Detect(name, mimeType, bytes.NewReader(b), int64(len(b)))
 		if k.Library == "" && k.Format != "" {
