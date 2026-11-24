@@ -6,12 +6,33 @@ The first version: one command and one package for every go-fast format,
 and archives.
 
 - **`cmd/gofast`**: reads files, directories and standard input in
-  parallel (`-j`), every format of go-fast-pdf, -ooxml, -odf, -rtf, -email
-  and -html, and zip, tar and gzip archives, each archive member a document
-  of its own (`data.zip/reports/q3.pdf`), archives inside archives down to
-  `-max-depth`. JSON Lines in the order of the inputs and members, or one
-  file per document in a tree under `-dir`; Markdown and text; core's
-  render flags and limits.
+  parallel (`-j`), every format of go-fast-pdf, -ooxml, -odf, -rtf, -email,
+  -html and -xml, and zip, tar and gzip archives, each archive member a
+  document of its own (`data.zip/reports/q3.pdf`), archives inside archives
+  down to `-max-depth`. JSON Lines in the order of the inputs and members,
+  or one file per document in a tree under `-dir`; Markdown and text;
+  core's render flags and limits.
+- **XML is read by go-fast-xml** (v0.1.0): `.xml`, `.dita`, `.ditamap`,
+  `.docbook` and `.tei` files, `application/xml`, `text/xml` and other
+  `+xml` types (not XHTML or SVG), and input that begins with an XML
+  declaration, has a document type declaration naming a root other than
+  `html`, or whose first element declares a namespace (not XHTML or SVG).
+  Its twelve built-in profiles are chosen by the root element. A
+  directory now stands for its XML files too. On main before, such files
+  were read by go-fast-html as HTML, or left out of a directory; and an
+  EPUB's manifest items of an XML type outside its reading order (a page
+  map, media overlays) were read as HTML and are now read by go-fast-xml.
+  `-charset` is tried for XML whose encoding go-fast-xml does not read.
+  `-xml-profile FILE` (`Extractor.XMLProfiles`) adds the caller's
+  profiles, tried before the built-in ones and chosen by the root element
+  as they are; `-xml-attributes=false` (`Extractor.XMLAttributes`) leaves
+  out the attribute notes of generic reading. Forcing one profile on
+  every XML file, as `gofastxml -profile` does, is left out: in a batch
+  of mixed files it would misread the others.
+  Through the umbrella, the 4,587 XML files of the public corpus's dev
+  set give the same JSON as `gofastxml`, with and without `-spans`; named
+  without an extension, 4,584 are detected as XML by their bytes, and 3
+  that have no declaration, document type or namespace are read as HTML.
 - **Package `gofast`**: `Detect` (declared media type, extension, bytes),
   `Extractor.Extract` for any input, `Extractor.Child` to read embedded
   documents of any format, `Extractor.Walk` over an archive's members.

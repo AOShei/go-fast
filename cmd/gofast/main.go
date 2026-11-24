@@ -51,6 +51,7 @@ import (
 
 	"github.com/AOShei/go-fast"
 	gofastcore "github.com/AOShei/go-fast-core"
+	gofastxml "github.com/AOShei/go-fast-xml"
 )
 
 func main() {
@@ -97,9 +98,12 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		maxMember   = flags.Int64("max-member-bytes", 0, "bytes of one archive member decompressed (0: the default, 1 GiB; -1: no limit)")
 		maxArchive  = flags.Int64("max-archive-bytes", 0, "bytes decompressed from one archive and the archives in it (0: the default, 64 GiB; -1: no limit)")
 		maxMemory   = flags.Int64("max-memory-bytes", 0, "bytes of decompressed archive members held at once by all the workers together (0: the default, 4 GiB); one member larger than it is still read, alone")
+		xmlAttrs    = flags.Bool("xml-attributes", true, "in XML read generically (no profile fits), make each attribute a note; -xml-attributes=false leaves them out, for data-style XML")
 		quiet       = flags.Bool("quiet", false, "say nothing about files that were read; failures are still reported")
 		showVersion = flags.Bool("version", false, "print the version and exit")
 	)
+	var xmlProfiles fileList
+	flags.Var(&xmlProfiles, "xml-profile", "a go-fast-xml profile file (JSON, see go-fast-xml's PROFILE_FORMAT.md), tried before the built-in profiles and chosen, as they are, by the root element; may be given more than once")
 	renderFlags := gofastcore.AddRenderFlags(flags)
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "usage: gofast [flags] file-or-directory...")
@@ -138,6 +142,16 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		extractor: &gofast.Extractor{MaxMemberBytes: *maxMember, MaxArchiveBytes: *maxArchive, Charset: *charset}}
 	if c.maxMemory == 0 {
 		c.maxMemory = 4 << 30
+	}
+	if !*xmlAttrs {
+		c.extractor.XMLAttributes = gofastxml.AttributesNone
+	}
+	for _, name := range xmlProfiles {
+		p, err := loadProfile(name)
+		if err != nil {
+			return fail("-xml-profile %s: %v", name, err)
+		}
+		c.extractor.XMLProfiles = append(c.extractor.XMLProfiles, p)
 	}
 	switch *images {
 	case "none":
@@ -821,4 +835,24 @@ func moduleVersion() string {
 		return info.Main.Version
 	}
 	return "(devel)"
+}
+
+// fileList is a flag that may be given more than once.
+type fileList []string
+
+func (f *fileList) String() string { return strings.Join(*f, ",") }
+
+func (f *fileList) Set(v string) error {
+	*f = append(*f, v)
+	return nil
+}
+
+// loadProfile reads a go-fast-xml profile file.
+func loadProfile(name string) (*gofastxml.Profile, error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return gofastxml.LoadProfile(f)
 }

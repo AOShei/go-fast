@@ -21,10 +21,11 @@ gofast -format markdown notes.docx       # one document as Markdown
 | RTF | [go-fast-rtf](https://github.com/AOShei/go-fast-rtf) |
 | Email: `.eml`, `.mbox`, Outlook `.msg`, TNEF (`winmail.dat`) | [go-fast-email](https://github.com/AOShei/go-fast-email) |
 | HTML, Markdown, plain text, EPUB, CSV, TSV, Jupyter notebooks, JSON and YAML (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`, `.yml`; as text, never by content) | [go-fast-html](https://github.com/AOShei/go-fast-html) |
+| XML of any schema (`.xml`, `.dita`, `.ditamap`, `.docbook`, `.tei`), with built-in profiles for Akoma Ntoso, HL7 CDA, CLML, DITA, DocBook, Formex, JATS, Légifrance, patents, S1000D, Service-Public and TEI | [go-fast-xml](https://github.com/AOShei/go-fast-xml) |
 | zip, tar, gzip (`.tar.gz`, `.tgz`, `.gz`) | this module |
 
 **How the format is decided** (`Detect`):
-1. A declared media type, for an embedded document (an attachment's `Content-Type`). The types mail programs give files they don't know better (`application/octet-stream`, `application/zip`, `text/plain`) yield to a known extension: a `.docx` sent as `application/zip` is still Word. A file declared `text/plain` with no such extension is text.
+1. A declared media type, for an embedded document (an attachment's `Content-Type`). The types mail programs give files they don't know better (`application/octet-stream`, `application/zip`, `text/plain`) yield to a known extension: a `.docx` sent as `application/zip` is still Word. A file declared `text/plain` with no such extension is text. `application/xml`, `text/xml` and any other `+xml` type are XML, but for `application/xhtml+xml` and `image/svg+xml`, which go-fast-html reads.
 2. The extension of the name.
 3. The bytes:
    - `%PDF-1.` or `%PDF-2.` in the first 1 KiB is PDF.
@@ -32,12 +33,14 @@ gofast -format markdown notes.docx       # one document as Markdown
    - gzip and tar are archives.
    - `{\rtf` is RTF.
    - An OLE compound file, a TNEF stream, a mailbox's `From ` line (an address, then a date with a time) or a message's header lines (at least two of the headers messages have, one of them `From`, `Received`, `Return-Path`, `Message-ID`, `MIME-Version` or `Delivered-To`) are email.
+   - An OpenDocument flat XML file is OpenDocument.
+   - XML is go-fast-xml's: input that begins with an XML declaration (`<?xml`), that has a document type declaration naming a root element other than `html`, or whose first element declares a namespace. A first element named `html` or `svg`, or in the XHTML or SVG namespace, stays with go-fast-html. XML with none of these marks (no declaration, no document type, no namespace) is read as HTML, unless its name or media type says XML.
    - Binary input (images, audio, executables) is read by none.
    - Anything else is what go-fast-html makes of it: HTML when it is markup, else plain text.
 
 Office 97–2003 files (`.doc`, `.xls`, `.ppt`) are not read yet; a library for them is being written.
 
-**Text that declares no character set** and is not UTF-8 is read in the set its bytes are certainly in (Shift_JIS, GBK, Big5, EUC-KR, windows-1251, windows-1252, UTF-16 without a byte order mark), with the warning `text.encoding_detected`, by go-fast-html and go-fast-email. Where no set is certain, a text file is refused (`gofasthtml.ErrEncodingUnknown`, which wraps `ErrUnsupported`) and a message's text keeps U+FFFD; `-charset` (`Extractor.Charset`) gives the set to use then. It never overrides a set the input declares: a `<meta>` or a `charset` parameter wins.
+**Text that declares no character set** and is not UTF-8 is read in the set its bytes are certainly in (Shift_JIS, GBK, Big5, EUC-KR, windows-1251, windows-1252, UTF-16 without a byte order mark), with the warning `text.encoding_detected`, by go-fast-html and go-fast-email; go-fast-xml also recognises an encoding from the bytes, with the same warning. Where no set is certain, a text file is refused (`gofasthtml.ErrEncodingUnknown`, which wraps `ErrUnsupported`), XML is refused (`ErrUnsupported`) and a message's text keeps U+FFFD; `-charset` (`Extractor.Charset`) gives the set to use then. It never overrides a set the input declares: a `<meta>`, an XML declaration's `encoding` or a `charset` parameter wins.
 
 **Embedded documents** are read by whichever library reads their format. A PDF attached to a message, a workbook embedded in a presentation, and a zip attached to a message (whose members become the zip's children) all come with the document that holds them. Core's depth limit (`-max-depth`, default 4) bounds how deeply they nest.
 
@@ -106,6 +109,8 @@ gofast [flags] file-or-directory...
 | `-cells` | the cells of spreadsheets with their types and formulas |
 | `-password` | for encrypted files |
 | `-charset LABEL` | the character set (`shift_jis`, `gbk`, `windows-1250`, ...) of text that declares none and whose set is not certain from its bytes; without it such a text file is not read, and text in a message has U+FFFD |
+| `-xml-profile FILE` | a go-fast-xml profile file (see its `PROFILE_FORMAT.md`), tried before the built-in profiles and chosen, as they are, by the root element, so it is safe in a batch of any formats; may be given more than once (`Extractor.XMLProfiles`) |
+| `-xml-attributes=false` | in XML no profile fits, leave out the note go-fast-xml makes of each attribute, for data-style XML (`Extractor.XMLAttributes`) |
 | `-max-input-bytes`, `-max-decoded-bytes`, `-max-text-bytes`, `-max-depth` | core's limits (`gofastcore.Limits`), for every document; `-max-input-bytes` also bounds standard input and pipes |
 | `-max-member-bytes`, `-max-archive-bytes`, `-max-memory-bytes` | the archive bounds above |
 | `-quiet` | say nothing about files that were read |

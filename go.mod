@@ -11,3 +11,5 @@ require (
 	github.com/AOShei/go-fast-pdf v0.3.0
 	github.com/AOShei/go-fast-rtf v0.2.1
 )
+
+require github.com/AOShei/go-fast-xml v0.1.0

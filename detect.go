@@ -20,6 +20,7 @@ const (
 	LibRTF   = "rtf"   // go-fast-rtf
 	LibEmail = "email" // go-fast-email: eml, mbox, msg, TNEF
 	LibHTML  = "html"  // go-fast-html: HTML, Markdown, text, EPUB, CSV, TSV, notebooks
+	LibXML   = "xml"   // go-fast-xml: XML of any schema, with profiles for some
 	// LibArchive is an archive this package opens: Format is "zip",
 	// "tar" or "gzip".
 	LibArchive = "archive"
@@ -61,6 +62,9 @@ var byExtension = map[string]Kind{
 	".ipynb": {LibHTML, "ipynb"},
 	".json":  {LibHTML, "json"}, ".jsonl": {LibHTML, "json"}, ".ndjson": {LibHTML, "json"}, ".geojson": {LibHTML, "json"},
 	".yaml": {LibHTML, "yaml"}, ".yml": {LibHTML, "yaml"},
+
+	".xml": {LibXML, ""}, ".dita": {LibXML, ""}, ".ditamap": {LibXML, ""}, ".docbook": {LibXML, ""},
+	".tei": {LibXML, ""},
 
 	".zip": {LibArchive, "zip"}, ".tar": {LibArchive, "tar"}, ".tgz": {LibArchive, "gzip"}, ".gz": {LibArchive, "gzip"},
 }
@@ -106,6 +110,8 @@ var byMIME = map[string]Kind{
 	"application/yaml": {LibHTML, "yaml"}, "application/x-yaml": {LibHTML, "yaml"}, "text/yaml": {LibHTML, "yaml"},
 	"text/x-yaml": {LibHTML, "yaml"},
 
+	"application/xml": {LibXML, ""}, "text/xml": {LibXML, ""},
+
 	"application/zip": {LibArchive, "zip"}, "application/x-zip-compressed": {LibArchive, "zip"},
 	"application/x-tar": {LibArchive, "tar"},
 	"application/gzip":  {LibArchive, "gzip"}, "application/x-gzip": {LibArchive, "gzip"},
@@ -131,6 +137,9 @@ const sniffBytes = 4096
 //     them From, Received, Return-Path, Message-ID, MIME-Version or
 //     Delivered-To) are email;
 //   - an OpenDocument flat XML file is OpenDocument;
+//   - XML is go-fast-xml's: input that begins with an XML declaration, or
+//     whose first element declares a namespace, unless that element is
+//     html or svg, which go-fast-html reads;
 //   - binary input (a NUL byte, or many control characters, in the first
 //     4 KiB: images, audio, executables) gives the zero Kind;
 //   - anything else is what go-fast-html's Detect says of it: HTML when
@@ -142,6 +151,9 @@ func Detect(name, mimeType string, r io.ReaderAt, size int64) Kind {
 	t := mediaType(mimeType)
 	if k, ok := byMIME[t]; ok && !generic[t] {
 		return k
+	}
+	if strings.HasSuffix(t, "+xml") && !xmlToHTML[t] {
+		return Kind{LibXML, ""}
 	}
 	ext := strings.ToLower(path.Ext(name))
 	if strings.HasSuffix(strings.ToLower(name), ".tar.gz") {
@@ -162,6 +174,10 @@ func Detect(name, mimeType string, r io.ReaderAt, size int64) Kind {
 	}
 	return sniff(name, r, size)
 }
+
+// xmlToHTML are the XML media types go-fast-html reads: XHTML and SVG
+// (an SVG's text without its drawing's attributes).
+var xmlToHTML = map[string]bool{"application/xhtml+xml": true, "image/svg+xml": true}
 
 // generic are the media types a mail program gives files it does not
 // know better: a .docx or an .epub sent as application/zip, a .pdf as
@@ -218,6 +234,8 @@ func sniff(name string, r io.ReaderAt, size int64) Kind {
 	case bytes.Contains(head, []byte("urn:oasis:names:tc:opendocument:xmlns:office:1.0")) &&
 		bytes.Contains(head, []byte("office:document")):
 		return Kind{LibODF, ""}
+	case isXML(head):
+		return Kind{LibXML, ""}
 	}
 	if isBinary(head) {
 		return Kind{}
