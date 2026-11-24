@@ -71,6 +71,8 @@ A member's name is cleaned: no leading `/` or drive letter, and no `.` element o
 
 A `.gz` or `.tar.gz` file of up to 1 GiB is read into memory and held while it is walked, counted under `-max-memory-bytes`: go-fast-core's `inflate` decompresses it about twice as fast as `compress/gzip`, which reads a larger file a piece at a time. The 1 GiB trades memory for speed: a 187 MB `.tar.gz` of 2,457 ODT files is walked in 0.46 s instead of 1.0 s, with a peak of 430 MB instead of 72 MB (the file, and the garbage collector's headroom over it). Zip members are decompressed with `inflate` too, a piece at a time, whatever their size.
 
+A zip cut short, which has lost the directory at its end, is read by its members' own headers (go-fast-core's `ziprecover`, as every go-fast library reads one). The members found are read; the one the file ends inside is reported as not read, and the archive is then reported damaged, saying how many members were found. Finding where members end is bounded by `-max-archive-bytes`.
+
 A zip whose members overlap is refused: no real archive shares bytes between members, and it is how the zip bombs that reach petabytes are built.
 
 As one document (`Extractor.Extract`, or embedded in a document), an archive has format `zip`, `tar` or `gzip`. It has one empty `body` part, with `part.no_text` at info, and its members are its children.

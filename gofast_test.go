@@ -673,3 +673,50 @@ func TestDanglingLink(t *testing.T) {
 		t.Errorf("%+v %v", skipped, err)
 	}
 }
+
+// TestZipCutShort: a zip archive cut short, its directory lost, gives the
+// members found by their own headers, skips the one it breaks off in, and
+// says so, as a damaged archive does.
+func TestZipCutShort(t *testing.T) {
+	long := strings.Repeat("the third member, ", 200)
+	b := zipOf(t, file{name: "a.txt", body: "first"}, file{name: "s.txt", body: "stored", store: true}, file{name: "c.txt", body: long})
+	dir := bytes.Index(b, []byte("PK\x01\x02"))
+	k := Kind{LibArchive, "zip"}
+	got, skipped, err := walkAll(t, &Extractor{}, k, "cut.zip", b[:dir], WalkOptions{})
+	if !errors.Is(err, ErrArchive) || !strings.Contains(err.Error(), "3 members were found by their own headers; any that followed are lost") ||
+		strings.Join(got, "|") != "a.txt=first|s.txt=stored|c.txt="+long || len(skipped) != 0 {
+		t.Errorf("cut before the directory: %q %+v %v", got, skipped, err)
+	}
+	// Cut in the third member: it is skipped, damaged.
+	at := bytes.Index(b, []byte("c.txt")) + 40
+	got, skipped, err = walkAll(t, &Extractor{}, k, "cut.zip", b[:at], WalkOptions{})
+	if !errors.Is(err, ErrArchive) || !strings.Contains(err.Error(), "the last, c.txt, breaks off") ||
+		strings.Join(got, "|") != "a.txt=first|s.txt=stored" || len(skipped) != 1 || skipped[0].Path != "c.txt" {
+		t.Errorf("cut in a member: %q %+v %v", got, skipped, err)
+	}
+	// As one document: its members, and input.repaired.
+	doc, err := (&Extractor{}).Extract(context.Background(), bytes.NewReader(b[:dir]), int64(dir), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repaired := false
+	for _, w := range doc.Warnings {
+		repaired = repaired || w.Code == gofastcore.WarnInputRepaired && strings.Contains(w.Message, "members were found by their own headers")
+	}
+	if len(doc.Children) != 3 || !repaired {
+		t.Errorf("as a document: %d children, repaired %v", len(doc.Children), repaired)
+	}
+	// A bomb without its directory meets the bound on what the walk may
+	// decompress (when recovery finds where it ends, in core, or when it
+	// is read).
+	bomb := zipOf(t, file{name: "zeros", body: string(make([]byte, 8<<20))})
+	cut := bomb[:bytes.Index(bomb, []byte("PK\x01\x02"))]
+	doc, err = (&Extractor{MaxArchiveBytes: 1 << 20}).Extract(context.Background(), bytes.NewReader(cut), int64(len(cut)), nil)
+	limited := false
+	for _, w := range doc.Warnings {
+		limited = limited || w.Code == gofastcore.WarnLimitExceeded
+	}
+	if err != nil || !limited || len(doc.Children) != 0 {
+		t.Errorf("a bomb without its directory, over the bound: %v, limit warning %v, %d children", err, limited, len(doc.Children))
+	}
+}

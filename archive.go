@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/AOShei/go-fast-core/inflate"
+	"github.com/AOShei/go-fast-core/ziprecover"
 )
 
 // Defaults of the bounds on archives.
@@ -129,13 +130,17 @@ func (w *archiveWalker) walk(format string, r io.ReaderAt, size int64, gzName st
 }
 
 func (w *archiveWalker) walkZip(r io.ReaderAt, size int64, fn func(Member) error, skip func(Skipped)) error {
-	z, err := zip.NewReader(r, size)
-	if err != nil && !errors.Is(err, zip.ErrInsecurePath) {
+	// go-fast-core's ziprecover reads the directory, or, for a zip cut
+	// short, finds the members by their own headers; deflated members are
+	// read with go-fast-core's inflate. Finding where members end is
+	// bounded by what the walk may still decompress.
+	z, rec, err := ziprecover.Open(r, size, ziprecover.Limits{MaxDecodedBytes: max(w.left, 1)})
+	switch {
+	case errors.Is(err, ziprecover.ErrBudget):
+		return errBudget
+	case err != nil:
 		return fmt.Errorf("gofast: zip: %v: %w", err, ErrArchive)
 	}
-	// Deflated members are read with go-fast-core's inflate, about twice
-	// as fast as compress/flate.
-	z.RegisterDecompressor(zip.Deflate, inflate.Decompressor)
 	if err := overlapping(z.File); err != nil {
 		return err
 	}
@@ -205,6 +210,11 @@ func (w *archiveWalker) walkZip(r io.ReaderAt, size int64, fn func(Member) error
 		if err := fn(m); err != nil {
 			return err
 		}
+	}
+	if rec != nil {
+		// The members found were read; that the rest is lost, and which
+		// member breaks off, is said as a damaged archive's is.
+		return fmt.Errorf("gofast: zip: %s: %w", rec.Message(cleanName), ErrArchive)
 	}
 	return nil
 }
