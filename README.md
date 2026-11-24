@@ -66,8 +66,10 @@ A member's name is cleaned: no leading `/` or drive letter, and no `.` element o
 |---|---|---|
 | One member, decompressed (held in memory to be read; a member stored uncompressed in a zip or plain tar is read in place) | `-max-member-bytes` | 1 GiB |
 | Everything decompressed from one archive and the archives in it | `-max-archive-bytes` | 64 GiB |
-| Decompressed members held in memory at once by all the workers | `-max-memory-bytes` | 4 GiB (a larger member is still read, alone; an archive inside an archive stays held until its members are read) |
+| Decompressed members held in memory at once by all the workers | `-max-memory-bytes` | 4 GiB (a larger member is still read, alone; an archive inside an archive stays held until its members are read; so does a `.gz` or `.tar.gz` file, below) |
 | Members of an archive read as one document (`Extractor.Extract`, or an archive embedded in a document) | `Extractor.MaxArchiveMembers` | 10,000 |
+
+A `.gz` or `.tar.gz` file of up to 1 GiB is read into memory and held while it is walked, counted under `-max-memory-bytes`: go-fast-core's `inflate` decompresses it about twice as fast as `compress/gzip`, which reads a larger file a piece at a time. The 1 GiB trades memory for speed: a 187 MB `.tar.gz` of 2,457 ODT files is walked in 0.46 s instead of 1.0 s, with a peak of 430 MB instead of 72 MB (the file, and the garbage collector's headroom over it). Zip members are decompressed with `inflate` too, a piece at a time, whatever their size.
 
 A zip whose members overlap is refused: no real archive shares bytes between members, and it is how the zip bombs that reach petabytes are built.
 

@@ -22,6 +22,12 @@ and archives.
   zip members larger than their compressed size allows are not read;
   member names are cleaned, and `-dir` writes nothing outside its
   directory, with names every system can create.
+- **Decompression with go-fast-core's `inflate`**, about twice as fast
+  as the standard library: zip members, and `.gz` and `.tar.gz` files of
+  up to 1 GiB, which are read into memory and held while they are walked
+  (counted under `-max-memory-bytes`); a larger one is read with
+  `compress/gzip`. The same output as before; a `.tar.gz` cut short is
+  reported as `inflate: the data ends early`, not `unexpected EOF`.
 - **JSON and YAML** (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`,
   `.yml`, and their media types) go to go-fast-html, as text; never by
   content.
@@ -30,7 +36,8 @@ and archives.
   go-fast-email for text in messages, and used for a file go-fast-html
   refuses with `ErrEncodingUnknown`; never before, so it does not override
   a `<meta>`.
-- Pins: go-fast-core v0.1.2, go-fast-pdf v0.3.0, go-fast-ooxml v0.3.0,
+- Pins: go-fast-core v0.1.5 (the comparisons below were made with
+  v0.1.2), go-fast-pdf v0.3.0, go-fast-ooxml v0.3.0,
   go-fast-odf v0.2.0, go-fast-rtf v0.2.0, go-fast-email v0.2.0,
   go-fast-html v0.3.0. Over the 6,644 documents of the public corpus and
   go-fast-ooxml's, the same files are read as with the earlier pins
