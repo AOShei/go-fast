@@ -20,8 +20,8 @@ gofast -format markdown notes.docx       # one document as Markdown
 | Word, Excel and PowerPoint 97-2003 (`.doc`, `.xls`, `.ppt` and their templates and shows) | [go-fast-msbin](https://github.com/AOShei/go-fast-msbin) |
 | OpenDocument text, spreadsheets and presentations, and their flat XML forms | [go-fast-odf](https://github.com/AOShei/go-fast-odf) |
 | RTF | [go-fast-rtf](https://github.com/AOShei/go-fast-rtf) |
-| Email: `.eml`, `.mbox`, Outlook `.msg`, TNEF (`winmail.dat`) | [go-fast-email](https://github.com/AOShei/go-fast-email) |
-| HTML, Markdown, plain text, EPUB, CSV, TSV, Jupyter notebooks, JSON and YAML (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`, `.yml`; as text, never by content) | [go-fast-html](https://github.com/AOShei/go-fast-html) |
+| Email: `.eml`, `.mbox`, Outlook `.msg`, TNEF (`winmail.dat`); calendars (`.ics`, `.ifb`, `.vcs`) and contact lists (`.vcf`, `.vcard`) | [go-fast-email](https://github.com/AOShei/go-fast-email) |
+| HTML, Markdown, plain text, EPUB, CSV, TSV, Jupyter notebooks, JSON and YAML (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`, `.yml`; as text, never by content), web pages saved as one file (`.mht`, `.mhtml`), subtitles (`.srt`, `.vtt`, `.webvtt`) | [go-fast-html](https://github.com/AOShei/go-fast-html) |
 | XML of any schema (`.xml`, `.dita`, `.ditamap`, `.docbook`, `.tei`, `.rss`, `.atom`), with built-in profiles for Akoma Ntoso, HL7 CDA, CLML, DITA, DocBook, Formex, JATS, Légifrance, patents, S1000D, Service-Public, TEI and web feeds (RSS, Atom). A feed is one document, and the HTML of its items is read by go-fast-html as its child documents | [go-fast-xml](https://github.com/AOShei/go-fast-xml) |
 | zip, tar, gzip (`.tar.gz`, `.tgz`, `.gz`) | this module |
 
