@@ -20,8 +20,8 @@ const (
 	LibMSBin = "msbin" // go-fast-msbin: Word, Excel and PowerPoint 97-2003
 	LibODF   = "odf"   // go-fast-odf: OpenDocument
 	LibRTF   = "rtf"   // go-fast-rtf
-	LibEmail = "email" // go-fast-email: eml, mbox, msg, TNEF
-	LibHTML  = "html"  // go-fast-html: HTML, Markdown, text, EPUB, CSV, TSV, notebooks
+	LibEmail = "email" // go-fast-email: eml, mbox, msg, TNEF, calendars, contacts
+	LibHTML  = "html"  // go-fast-html: HTML, Markdown, text, EPUB, CSV, TSV, notebooks, JSON, YAML, MHTML, subtitles
 	LibXML   = "xml"   // go-fast-xml: XML of any schema, with profiles for some
 	// LibArchive is an archive this package opens: Format is "zip",
 	// "tar" or "gzip".
@@ -55,6 +55,7 @@ var byExtension = map[string]Kind{
 	".rtf": {LibRTF, ""},
 
 	".eml": {LibEmail, ""}, ".mbox": {LibEmail, ""}, ".mbx": {LibEmail, ""}, ".msg": {LibEmail, ""},
+	".ics": {LibEmail, ""}, ".ifb": {LibEmail, ""}, ".vcs": {LibEmail, ""}, ".vcf": {LibEmail, ""}, ".vcard": {LibEmail, ""},
 
 	".html": {LibHTML, "html"}, ".htm": {LibHTML, "html"}, ".xhtml": {LibHTML, "html"}, ".shtml": {LibHTML, "html"},
 	".md": {LibHTML, "md"}, ".markdown": {LibHTML, "md"}, ".mdown": {LibHTML, "md"}, ".mkd": {LibHTML, "md"},
@@ -64,6 +65,8 @@ var byExtension = map[string]Kind{
 	".ipynb": {LibHTML, "ipynb"},
 	".json":  {LibHTML, "json"}, ".jsonl": {LibHTML, "json"}, ".ndjson": {LibHTML, "json"}, ".geojson": {LibHTML, "json"},
 	".yaml": {LibHTML, "yaml"}, ".yml": {LibHTML, "yaml"},
+	".mht": {LibHTML, "mht"}, ".mhtml": {LibHTML, "mht"},
+	".srt": {LibHTML, "srt"}, ".vtt": {LibHTML, "vtt"}, ".webvtt": {LibHTML, "vtt"},
 
 	".xml": {LibXML, ""}, ".dita": {LibXML, ""}, ".ditamap": {LibXML, ""}, ".docbook": {LibXML, ""},
 	".tei": {LibXML, ""}, ".rss": {LibXML, ""}, ".atom": {LibXML, ""},
@@ -103,6 +106,8 @@ var byMIME = map[string]Kind{
 
 	"message/rfc822": {LibEmail, ""}, "message/global": {LibEmail, ""}, "application/vnd.ms-outlook": {LibEmail, ""},
 	"application/mbox": {LibEmail, ""}, "application/vnd.ms-tnef": {LibEmail, ""},
+	"text/calendar": {LibEmail, ""}, "application/ics": {LibEmail, ""}, "text/x-vcalendar": {LibEmail, ""},
+	"text/vcard": {LibEmail, ""}, "text/x-vcard": {LibEmail, ""}, "text/directory": {LibEmail, ""},
 
 	"text/html": {LibHTML, "html"}, "application/xhtml+xml": {LibHTML, "html"},
 	"text/markdown": {LibHTML, "md"}, "text/plain": {LibHTML, "txt"},
@@ -110,7 +115,9 @@ var byMIME = map[string]Kind{
 	"application/x-ipynb+json": {LibHTML, "ipynb"}, "application/epub+zip": {LibHTML, "epub"},
 	"application/json": {LibHTML, "json"}, "application/x-ndjson": {LibHTML, "json"}, "application/geo+json": {LibHTML, "json"},
 	"application/yaml": {LibHTML, "yaml"}, "application/x-yaml": {LibHTML, "yaml"}, "text/yaml": {LibHTML, "yaml"},
-	"text/x-yaml": {LibHTML, "yaml"},
+	"text/x-yaml":               {LibHTML, "yaml"},
+	"application/x-mimearchive": {LibHTML, "mht"}, "text/vtt": {LibHTML, "vtt"},
+	"application/x-subrip": {LibHTML, "srt"}, "text/srt": {LibHTML, "srt"},
 
 	"application/xml": {LibXML, ""}, "text/xml": {LibXML, ""},
 	// Tika's names for Office 2003's XML formats.
@@ -139,6 +146,12 @@ const sniffBytes = 4096
 //   - an OLE compound file is go-fast-msbin's when its directory holds
 //     the streams of a Word, Excel or PowerPoint 97-2003 file
 //     (go-fast-msbin's Detect), and otherwise email;
+//   - a web page a browser saved as one file (MHTML: a header with
+//     Snapshot-Content-Location, or From "Saved by ...", and a
+//     multipart/related Content-Type, as go-fast-html's Detect tells it)
+//     is go-fast-html's, before the test for a message;
+//   - a calendar or a contact list (a first line BEGIN:VCALENDAR,
+//     BEGIN:VCARD or BEGIN: and a component a calendar holds) is email;
 //   - a TNEF stream, a mailbox's
 //     "From " line (an address, then a date with a time) or a message's
 //     header lines (at least two of the headers messages have, one of
@@ -280,6 +293,10 @@ func sniff(name string, r io.ReaderAt, size int64) Kind {
 			return Kind{LibMSBin, f}
 		}
 		return Kind{LibEmail, ""}
+	case gofasthtml.Detect("", head) == "mht":
+		return Kind{LibHTML, "mht"}
+	case vobjBegin(head):
+		return Kind{LibEmail, ""}
 	case bytes.HasPrefix(head, []byte{0x78, 0x9f, 0x3e, 0x22}): // TNEF
 		return Kind{LibEmail, ""}
 	case mboxLine(head):
@@ -320,6 +337,24 @@ func isBinary(head []byte) bool {
 }
 
 // sniffZip decides what a zip archive is from its members.
+// vobjBegin reports whether head begins, after a byte order mark and
+// white space, with the BEGIN line of a calendar or a contact list (a
+// group may come before a vCard's), as go-fast-email reads them.
+func vobjBegin(head []byte) bool {
+	head = bytes.TrimLeft(bytes.TrimPrefix(head, []byte("\xEF\xBB\xBF")), " \t\r\n")
+	line, _, _ := bytes.Cut(head[:min(len(head), 128)], []byte("\n"))
+	line = bytes.TrimRight(line, " \t\r")
+	if i := bytes.IndexByte(line, '.'); i > 0 && i < bytes.IndexByte(line, ':') {
+		line = line[i+1:]
+	}
+	switch strings.ToUpper(string(line)) {
+	case "BEGIN:VCALENDAR", "BEGIN:VCARD", "BEGIN:VEVENT", "BEGIN:VTODO", "BEGIN:VJOURNAL",
+		"BEGIN:VFREEBUSY", "BEGIN:VAVAILABILITY", "BEGIN:VTIMEZONE":
+		return true
+	}
+	return false
+}
+
 func sniffZip(r io.ReaderAt, size int64) Kind {
 	z, err := zip.NewReader(r, size)
 	if err != nil {

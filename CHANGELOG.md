@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+Pins go-fast-html v0.5.0 (after v0.4.4), go-fast-email v0.3.0 (after
+v0.2.1), go-fast-core v0.1.9 (after v0.1.8), go-fast-pdf v0.4.0 (after
+v0.3.1), go-fast-ooxml v0.5.3 (after v0.5.2) and go-fast-msbin v0.1.5
+(after v0.1.4).
+
+- **Five more formats are routed:**
+  - web pages saved as one file (`.mht`, `.mhtml`, `multipart/related`
+    saved by a browser), read by go-fast-html as the page with its
+    images;
+  - subtitles: SubRip (`.srt`) and WebVTT (`.vtt`, `.webvtt`), read by
+    go-fast-html, a paragraph per cue with its times;
+  - calendars (`.ics`, `.ifb`, `.vcs`, `text/calendar`) and contacts
+    (`.vcf`, `.vcard`, `text/vcard`), read by go-fast-email, a heading
+    and details for each event or person. A meeting invitation inside an
+    email is read as a calendar.
+  Files are recognised by name, media type and content (an MHTML header,
+  a `BEGIN:VCALENDAR` or `BEGIN:VCARD` first line, the WebVTT signature).
+- **PDF (go-fast-pdf v0.4.0):** paragraphs and reading order. A sentence
+  is no longer cut where it passes between two copies of one typeface; an
+  entry of a table of contents is a paragraph of its own; text in Hebrew
+  and Arabic reads in the direction of its paragraph. See go-fast-pdf's
+  CHANGELOG.
+- Workbooks (go-fast-ooxml, go-fast-msbin through go-fast-core v0.1.9)
+  are read about 1 to 2 percent faster; no cell changes.
+- **Checked against v0.1.3 on the public corpus:** output changes only in
+  the five formats routed now (ics, vcf, mht, srt, vtt): 302 of their 307
+  dev files and 108 of their 109 held-out files, read as text before (the
+  others are SubRip files of uncertain encoding, refused before and now).
+  No other output changes, in 5,227 dev files or, by hash, 1,684 held-out
+  files. (The PDF and Office corpora are compared in their libraries.)
+
 ## v0.1.3 (2026-11-25)
 
 Pins go-fast-core v0.1.8 (after v0.1.6), go-fast-ooxml v0.5.2 (after
