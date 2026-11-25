@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## v0.1.2 (2026-11-25)
+
+Pins go-fast-xml v0.2.0 (after v0.1.0).
 
 - **Web feeds** (go-fast-xml v0.2.0, after v0.1.0): RSS 0.91 to 2.0,
   RSS 1.0 and Atom 1.0 are read with go-fast-xml's new `feed` profile,
