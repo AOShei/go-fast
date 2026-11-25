@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+Pins go-fast-core v0.1.8 (after v0.1.6), go-fast-ooxml v0.5.2 (after
+v0.5.0), go-fast-msbin v0.1.4 (after v0.1.3), go-fast-pdf v0.3.1 (after
+v0.3.0) and go-fast-xml v0.2.1 (after v0.2.0).
+
+- **Workbooks are read faster.** go-fast-ooxml and go-fast-msbin show a
+  sheet's numbers through one engine, go-fast-core's `numfmt`, and
+  remember what each format made of a value, so a number repeated on a
+  sheet is copied, not worked out again (core's `numfmt.Cache`: 256
+  entries a sheet in ooxml, 4,096 in msbin). No cell changes.
+- go-fast-pdf v0.3.1 decompresses with go-fast-core's `inflate`; the
+  error of a damaged stream in a warning begins `inflate:` where it said
+  `zlib:`.
+- go-fast-xml v0.2.1 changes only its own command.
+- **Checked against v0.1.2 on the public corpus:** no output changes, in
+  5,038 dev files or, by hash, 1,633 held-out files.
+
 ## v0.1.2 (2026-11-25)
 
 Pins go-fast-xml v0.2.0 (after v0.1.0).
