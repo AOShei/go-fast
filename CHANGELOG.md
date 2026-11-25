@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## v0.1.3 (2026-11-25)
 
 Pins go-fast-core v0.1.8 (after v0.1.6), go-fast-ooxml v0.5.2 (after
 v0.5.0), go-fast-msbin v0.1.4 (after v0.1.3), go-fast-pdf v0.3.1 (after
