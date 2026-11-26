@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.5 (2026-11-26)
 
 Pins go-fast-html v0.6.0 (after v0.5.0).
 
