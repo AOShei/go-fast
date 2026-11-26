@@ -14,5 +14,5 @@ require (
 
 require (
 	github.com/AOShei/go-fast-msbin v0.1.5
-	github.com/AOShei/go-fast-xml v0.2.1
+	github.com/AOShei/go-fast-xml v0.4.1
 )

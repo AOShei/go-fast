@@ -72,6 +72,10 @@ var byExtension = map[string]Kind{
 
 	".xml": {LibXML, ""}, ".dita": {LibXML, ""}, ".ditamap": {LibXML, ""}, ".docbook": {LibXML, ""},
 	".tei": {LibXML, ""}, ".rss": {LibXML, ""}, ".atom": {LibXML, ""},
+	// Translation files: XLIFF (with the XLIFF 1.2 of Trados, Phrase and
+	// memoQ) and TMX. Not .nitf or .ntf, which binary imagery files use.
+	".xlf": {LibXML, ""}, ".xliff": {LibXML, ""}, ".tmx": {LibXML, ""},
+	".sdlxliff": {LibXML, ""}, ".mxliff": {LibXML, ""}, ".mqxliff": {LibXML, ""},
 
 	".zip": {LibArchive, "zip"}, ".tar": {LibArchive, "tar"}, ".tgz": {LibArchive, "gzip"}, ".gz": {LibArchive, "gzip"},
 }

@@ -6,6 +6,34 @@
   uses, the only change since v0.1.9 is two new stored kinds: `gofast
   -stored=` now also accepts `shape_data` and `linked_data`, which Visio
   drawings in go-fast-ooxml will use.
+- **go-fast-xml v0.4.1** (was v0.2.1): 26 built-in profiles (were 13).
+  New: electronic invoices (Cross Industry Invoice: Factur-X, ZUGFeRD 2,
+  XRechnung; UBL: Peppol), DILA case law with KALI and CNIL, Canadian
+  federal laws, translation files (TMX, XLIFF 1.x and 2.x), PubMed
+  citations, news agency formats (NewsML-G2, NITF) and procurement
+  notices (EU eForms, TED, BOAMP). Children: invoices and XLIFF files
+  hand their base64 attachments to the library for their media type,
+  NewsML-G2 an item's XHTML body and BOAMP a notice's HTML page to
+  go-fast-html.
+- **Translation files are routed to go-fast-xml by name**, in a
+  directory walk too: `.xlf`, `.xliff`, `.tmx`, and the XLIFF 1.2 of
+  Trados, Phrase and memoQ, `.sdlxliff`, `.mxliff`, `.mqxliff`. Not
+  `.nitf` or `.ntf`, which binary imagery files also use: NITF stories
+  are named `.xml`.
+- **Factur-X and ZUGFeRD PDFs:** the invoice a PDF embeds reaches
+  go-fast-xml and is read with the `cii` profile. Checked on 4 PDFs of
+  the ZUGFeRD corpus (new dev set `pdf-facturx`); before, it was read as
+  generic XML.
+- **Checked against main (go-fast-xml v0.2.1) on the public corpus:**
+  output changes in 4,640 of 10,302 dev files and, by hash, 1,574 of
+  3,411 held-out files, all in the XML sets and the four Factur-X PDFs.
+  The sets with a new profile change but for files still read
+  generically or refused (dev: 18 of 223 invoices, 2 of 524 eForms
+  notices, as go-fast-xml reports) and 63 of 1,436 DILA files already
+  read with `legifrance`. Akoma Ntoso, CLML and JATS change in 14, 32
+  and 1 dev files, where a section number written as its own paragraph
+  now takes its own section's attributes (go-fast-xml v0.3.0). No other
+  set changes.
 
 ## v0.1.6 (2026-11-26)
 

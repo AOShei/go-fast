@@ -35,6 +35,12 @@ func TestDetectXML(t *testing.T) {
 		{"text.tei", "", nil, xml},
 		{"news.rss", "", nil, xml},
 		{"News.ATOM", "", nil, xml},
+		{"strings.xlf", "", nil, xml},
+		{"strings.XLIFF", "", nil, xml},
+		{"memory.tmx", "", nil, xml},
+		{"job.sdlxliff", "", nil, xml},
+		{"job.mxliff", "", nil, xml},
+		{"job.mqxliff", "", nil, xml},
 		{"x", "application/xml", nil, xml},
 		{"x", "text/xml; charset=iso-8859-1", nil, xml},
 		{"x", "application/atom+xml", nil, xml},
@@ -66,6 +72,13 @@ func TestDetectXML(t *testing.T) {
 		got := Detect(c.name, c.mime, bytes.NewReader(c.body), int64(len(c.body)))
 		if got != c.want {
 			t.Errorf("Detect(%q, %q, %.40q) = %+v, want %+v", c.name, c.mime, c.body, got, c.want)
+		}
+	}
+	// NITF stories are named .xml: .nitf and .ntf are also the names of
+	// binary imagery files, which a walk must not hand to go-fast-xml.
+	for _, n := range []string{"story.nitf", "image.ntf"} {
+		if KnownExtension(n) {
+			t.Errorf("KnownExtension(%q) is true", n)
 		}
 	}
 }
