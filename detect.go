@@ -50,7 +50,8 @@ var byExtension = map[string]Kind{
 	".potx": {LibOOXML, ""}, ".potm": {LibOOXML, ""},
 
 	".odt": {LibODF, ""}, ".ott": {LibODF, ""}, ".odm": {LibODF, ""}, ".ods": {LibODF, ""}, ".ots": {LibODF, ""},
-	".odp": {LibODF, ""}, ".otp": {LibODF, ""}, ".fodt": {LibODF, ""}, ".fods": {LibODF, ""}, ".fodp": {LibODF, ""},
+	".odp": {LibODF, ""}, ".otp": {LibODF, ""}, ".odg": {LibODF, ""}, ".otg": {LibODF, ""},
+	".fodt": {LibODF, ""}, ".fods": {LibODF, ""}, ".fodp": {LibODF, ""}, ".fodg": {LibODF, ""},
 
 	".rtf": {LibRTF, ""},
 
@@ -102,6 +103,8 @@ var byMIME = map[string]Kind{
 	"application/vnd.oasis.opendocument.spreadsheet-template":  {LibODF, ""},
 	"application/vnd.oasis.opendocument.presentation":          {LibODF, ""},
 	"application/vnd.oasis.opendocument.presentation-template": {LibODF, ""},
+	"application/vnd.oasis.opendocument.graphics":              {LibODF, ""},
+	"application/vnd.oasis.opendocument.graphics-template":     {LibODF, ""},
 
 	"application/rtf": {LibRTF, ""}, "text/rtf": {LibRTF, ""},
 
