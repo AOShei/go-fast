@@ -17,11 +17,11 @@ Pins go-fast-ooxml v0.6.0 (after v0.5.3).
   in the Visio sets, 26 of 10,302 dev files and 12 of 3,411 held-out
   files. Before, 19 dev and 9 held-out Visio files were refused ("no
   Word, Excel or PowerPoint document"), and 7 dev and 3 held-out files
-  were opened as zip archives, their parts read as XML: POI's 6 fuzzer
-  cases, whose zip directory is damaged, so that detection by bytes
-  cannot look for `[Content_Types].xml`, and a libvisio file without
-  one. All 38 are now
-  read as Visio, by their name.
+  were opened as zip archives, each member a document of its own (in
+  dev: POI's 6 fuzzer cases, whose zip directory is damaged, so that
+  detection by bytes cannot look for `[Content_Types].xml`, and a
+  libvisio file without one). All 38 are now read as Visio, by their
+  name.
 
 ## v0.1.7 (2026-11-26)
 
