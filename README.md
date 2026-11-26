@@ -16,7 +16,7 @@ gofast -format markdown notes.docx       # one document as Markdown
 | Formats | Library |
 |---|---|
 | PDF | [go-fast-pdf](https://github.com/AOShei/go-fast-pdf) |
-| Word, Excel and PowerPoint 2007 and later (`.docx`, `.xlsx`, `.xlsb`, `.pptx` and their macro and template variants), and Office documents saved as one XML file: Flat OPC, Word 2003's XML document and Excel 2003's XML spreadsheet | [go-fast-ooxml](https://github.com/AOShei/go-fast-ooxml) |
+| Word, Excel and PowerPoint 2007 and later (`.docx`, `.xlsx`, `.xlsb`, `.pptx` and their macro and template variants); Visio 2013 and later: drawings, templates and stencils, with and without macros (`.vsdx`, `.vsdm`, `.vstx`, `.vstm`, `.vssx`, `.vssm`; the binary `.vsd` and the XML `.vdx` of Visio 2003-2010 are not read as Visio); and Office documents saved as one XML file: Flat OPC, Word 2003's XML document and Excel 2003's XML spreadsheet | [go-fast-ooxml](https://github.com/AOShei/go-fast-ooxml) |
 | Word, Excel and PowerPoint 97-2003 (`.doc`, `.xls`, `.ppt` and their templates and shows) | [go-fast-msbin](https://github.com/AOShei/go-fast-msbin) |
 | OpenDocument text, spreadsheets, presentations and drawings (`.odg`), and their flat XML forms | [go-fast-odf](https://github.com/AOShei/go-fast-odf) |
 | RTF | [go-fast-rtf](https://github.com/AOShei/go-fast-rtf) |
@@ -30,7 +30,7 @@ gofast -format markdown notes.docx       # one document as Markdown
 2. The extension of the name.
 3. The bytes:
    - `%PDF-1.` or `%PDF-2.` in the first 1 KiB is PDF.
-   - A zip archive is Office if it has `[Content_Types].xml`, OpenDocument or EPUB if its `mimetype` member says so, and otherwise an archive.
+   - A zip archive is Office if it has `[Content_Types].xml`, or if its package relationships (`_rels/.rels`) name a Visio document (some programs write Visio drawings without `[Content_Types].xml`); OpenDocument or EPUB if its `mimetype` member says so; and otherwise an archive.
    - gzip and tar are archives.
    - `{\rtf` is RTF.
    - An OLE compound file is Word, Excel or PowerPoint 97-2003 (go-fast-msbin) when its directory holds those formats' streams (go-fast-msbin's `Detect`), and otherwise email.
