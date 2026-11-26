@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.6 (2026-11-26)
 
 Pins go-fast-odf v0.3.0 (after v0.2.2).
 
