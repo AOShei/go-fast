@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.4 (2026-11-26)
 
 Pins go-fast-html v0.5.0 (after v0.4.4), go-fast-email v0.3.0 (after
 v0.2.1), go-fast-core v0.1.9 (after v0.1.8), go-fast-pdf v0.4.0 (after
