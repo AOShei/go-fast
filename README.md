@@ -2,7 +2,7 @@
 
 The front door of the go-fast libraries. It reads a file of any of their formats by sending it to the library that reads it, opens zip, tar and gzip archives, and reads many files in parallel. Everything comes out in the shared document model, `gofastcore.Document` (`github.com/AOShei/go-fast-core`).
 
-**Status: v0.1.3 (2026-11-25).** The changes are in [`CHANGELOG.md`](CHANGELOG.md).
+**Status: v0.1.5 (2026-11-26).** The changes are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ```
 go install github.com/AOShei/go-fast/cmd/gofast@latest
