@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+Pins go-fast-ooxml v0.6.0 (after v0.5.3).
+
+- **Visio 2013 and later** go to go-fast-ooxml v0.6.0, which reads
+  drawings, templates and stencils, with and without macros, under the
+  format name `vsdx` (`Source.MIME` tells them apart): by name
+  (`.vsdx`, `.vsdm`, `.vstx`, `.vstm`, `.vssx`, `.vssm`, in a directory
+  walk too), by their six media types, and by their bytes: a zip with
+  `[Content_Types].xml`, as before, or one whose package relationships
+  (`_rels/.rels`) name a Visio document, which some programs write
+  without `[Content_Types].xml`. The binary `.vsd` and the XML `.vdx`
+  of Visio 2003-2010 are not read as Visio.
+- **Checked against main on the public corpus:** output changes only
+  in the Visio sets, 26 of 10,302 dev files and 12 of 3,411 held-out
+  files. Before, 19 dev and 9 held-out Visio files were refused ("no
+  Word, Excel or PowerPoint document"), and 7 dev and 3 held-out files
+  were opened as zip archives, their parts read as XML: POI's 6 fuzzer
+  cases, whose zip directory is damaged, so that detection by bytes
+  cannot look for `[Content_Types].xml`, and a libvisio file without
+  one. All 38 are now
+  read as Visio, by their name.
+
 ## v0.1.7 (2026-11-26)
 
 Pins go-fast-xml v0.4.1 (after v0.2.1) and go-fast-core v0.1.11 (after v0.1.9).

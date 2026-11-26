@@ -1,5 +1,5 @@
 // Command gofast extracts documents of every format the go-fast libraries
-// read (PDF; Word, Excel and PowerPoint; OpenDocument; RTF; email; HTML,
+// read (PDF; Word, Excel, PowerPoint and Visio; OpenDocument; RTF; email; HTML,
 // Markdown, text, EPUB, CSV, TSV and Jupyter notebooks) into their shared
 // document model and prints them as JSON, Markdown or plain text. It opens
 // zip, tar and gzip archives, and reads many files in parallel.

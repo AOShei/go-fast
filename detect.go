@@ -16,7 +16,7 @@ import (
 // package opens itself.
 const (
 	LibPDF   = "pdf"   // go-fast-pdf
-	LibOOXML = "ooxml" // go-fast-ooxml: Word, Excel and PowerPoint 2007 and later
+	LibOOXML = "ooxml" // go-fast-ooxml: Word, Excel, PowerPoint 2007 and later, Visio 2013 and later
 	LibMSBin = "msbin" // go-fast-msbin: Word, Excel and PowerPoint 97-2003
 	LibODF   = "odf"   // go-fast-odf: OpenDocument
 	LibRTF   = "rtf"   // go-fast-rtf
@@ -48,6 +48,8 @@ var byExtension = map[string]Kind{
 	".xlsx": {LibOOXML, ""}, ".xlsm": {LibOOXML, ""}, ".xltx": {LibOOXML, ""}, ".xltm": {LibOOXML, ""}, ".xlsb": {LibOOXML, ""},
 	".pptx": {LibOOXML, ""}, ".pptm": {LibOOXML, ""}, ".ppsx": {LibOOXML, ""}, ".ppsm": {LibOOXML, ""},
 	".potx": {LibOOXML, ""}, ".potm": {LibOOXML, ""},
+	".vsdx": {LibOOXML, ""}, ".vsdm": {LibOOXML, ""}, ".vstx": {LibOOXML, ""}, ".vstm": {LibOOXML, ""},
+	".vssx": {LibOOXML, ""}, ".vssm": {LibOOXML, ""},
 
 	".odt": {LibODF, ""}, ".ott": {LibODF, ""}, ".odm": {LibODF, ""}, ".ods": {LibODF, ""}, ".ots": {LibODF, ""},
 	".odp": {LibODF, ""}, ".otp": {LibODF, ""}, ".odg": {LibODF, ""}, ".otg": {LibODF, ""},
@@ -99,6 +101,12 @@ var byMIME = map[string]Kind{
 	"application/vnd.ms-powerpoint.presentation.macroenabled.12":                {LibOOXML, ""},
 	"application/vnd.ms-powerpoint.slideshow.macroenabled.12":                   {LibOOXML, ""},
 	"application/vnd.ms-powerpoint.template.macroenabled.12":                    {LibOOXML, ""},
+	"application/vnd.ms-visio.drawing":                                          {LibOOXML, ""},
+	"application/vnd.ms-visio.drawing.macroenabled.12":                          {LibOOXML, ""},
+	"application/vnd.ms-visio.template":                                         {LibOOXML, ""},
+	"application/vnd.ms-visio.template.macroenabled.12":                         {LibOOXML, ""},
+	"application/vnd.ms-visio.stencil":                                          {LibOOXML, ""},
+	"application/vnd.ms-visio.stencil.macroenabled.12":                          {LibOOXML, ""},
 
 	"application/vnd.oasis.opendocument.text":                  {LibODF, ""},
 	"application/vnd.oasis.opendocument.text-template":         {LibODF, ""},
@@ -146,9 +154,10 @@ const sniffBytes = 4096
 // for text/plain, which is text, the bytes:
 //
 //   - "%PDF-1." or "%PDF-2." in the first 1 KiB is PDF;
-//   - a zip archive is Office if it has [Content_Types].xml,
-//     OpenDocument or EPUB if its mimetype member says so, and otherwise
-//     an archive;
+//   - a zip archive is Office if it has [Content_Types].xml, or a
+//     package relationship to a Visio document (some programs write
+//     Visio drawings with no [Content_Types].xml), OpenDocument or EPUB
+//     if its mimetype member says so, and otherwise an archive;
 //   - gzip and tar (ustar) are archives;
 //   - "{\rtf" is RTF;
 //   - an OLE compound file is go-fast-msbin's when its directory holds
@@ -372,6 +381,8 @@ func sniffZip(r io.ReaderAt, size int64) Kind {
 		switch {
 		case f.Name == "[Content_Types].xml":
 			return Kind{LibOOXML, ""}
+		case f.Name == "_rels/.rels" && f.UncompressedSize64 <= relsBytes && visioRels(f):
+			return Kind{LibOOXML, ""}
 		case i == 0 && f.Name == "mimetype" && f.UncompressedSize64 < 256:
 			rc, err := f.Open()
 			if err != nil {
@@ -389,6 +400,26 @@ func sniffZip(r io.ReaderAt, size int64) Kind {
 		}
 	}
 	return Kind{LibArchive, "zip"}
+}
+
+// relsBytes is the largest package relationships member sniffZip reads.
+const relsBytes = 64 << 10
+
+// visioRelType is the type of a package's relationship to its Visio
+// document.
+const visioRelType = "http://schemas.microsoft.com/visio/2010/relationships/document"
+
+// visioRels reports whether a package's relationships member names a
+// Visio document: a zip with no [Content_Types].xml that go-fast-ooxml
+// reads through its relationships.
+func visioRels(f *zip.File) bool {
+	rc, err := f.Open()
+	if err != nil {
+		return false
+	}
+	defer rc.Close()
+	b, _ := io.ReadAll(io.LimitReader(rc, relsBytes))
+	return bytes.Contains(b, []byte(visioRelType))
 }
 
 // messageHeaders reports whether an input begins with the header lines of

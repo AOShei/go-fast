@@ -8,8 +8,8 @@ github.com/AOShei/go-fast-msbin v0.1.5 h1:PbC/xPdZEYjq/4E+6RPVDVPDorhoZNZ9E8MdAD
 github.com/AOShei/go-fast-msbin v0.1.5/go.mod h1:wXHGQlhDsIkWt3wavZm5toJunCPnqA65AkDOnG7kQJY=
 github.com/AOShei/go-fast-odf v0.3.0 h1:7GqF0G7puGVQPbJPY9YuLDGoxUS1pRTsiieTfzweuc4=
 github.com/AOShei/go-fast-odf v0.3.0/go.mod h1:en65aqf5dP9SUCM2B77pLxCEvlLaHmQeY7TsYnNmKQo=
-github.com/AOShei/go-fast-ooxml v0.5.3 h1:/9cdmRpsiau06tKz10sCosRkSaPLRkfLxzXQVKU5A1s=
-github.com/AOShei/go-fast-ooxml v0.5.3/go.mod h1:EMaNGg4SQ3k6Yoz2rewHBJU09u27HTa+vmcfkCFudRA=
+github.com/AOShei/go-fast-ooxml v0.6.0 h1:vThjwsSe4WHL1hDlPQohHh66g/V79uKwqiZBS3mCAUk=
+github.com/AOShei/go-fast-ooxml v0.6.0/go.mod h1:5SnY2MCLmGAieesqTX3m2s1FQSRxpEf0ggCZ1O0raYo=
 github.com/AOShei/go-fast-pdf v0.4.0 h1:d+aTux9gVl7BdczViDw3c63/jSZEyAIBciLdqA58IEQ=
 github.com/AOShei/go-fast-pdf v0.4.0/go.mod h1:KCpSdtfpWaQ5KeL7KM+W8d8dqpRBjuzSnwHBK4eBNyw=
 github.com/AOShei/go-fast-rtf v0.2.1 h1:6IrxwvoZy2P2a3LtyLCzlP/Mt6/nwvRNo6lzzDPBS60=
