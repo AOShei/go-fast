@@ -18,7 +18,7 @@ gofast -format markdown notes.docx       # one document as Markdown
 | PDF | [go-fast-pdf](https://github.com/AOShei/go-fast-pdf) |
 | Word, Excel and PowerPoint 2007 and later (`.docx`, `.xlsx`, `.xlsb`, `.pptx` and their macro and template variants), and Office documents saved as one XML file: Flat OPC, Word 2003's XML document and Excel 2003's XML spreadsheet | [go-fast-ooxml](https://github.com/AOShei/go-fast-ooxml) |
 | Word, Excel and PowerPoint 97-2003 (`.doc`, `.xls`, `.ppt` and their templates and shows) | [go-fast-msbin](https://github.com/AOShei/go-fast-msbin) |
-| OpenDocument text, spreadsheets and presentations, and their flat XML forms | [go-fast-odf](https://github.com/AOShei/go-fast-odf) |
+| OpenDocument text, spreadsheets, presentations and drawings (`.odg`), and their flat XML forms | [go-fast-odf](https://github.com/AOShei/go-fast-odf) |
 | RTF | [go-fast-rtf](https://github.com/AOShei/go-fast-rtf) |
 | Email: `.eml`, `.mbox`, Outlook `.msg`, TNEF (`winmail.dat`); calendars (`.ics`, `.ifb`, `.vcs`) and contact lists (`.vcf`, `.vcard`) | [go-fast-email](https://github.com/AOShei/go-fast-email) |
 | HTML, Markdown (also Cursor rules `.mdc`, Quarto `.qmd`, R Markdown `.Rmd`; front matter to the metadata), plain text, EPUB, CSV, TSV, Jupyter notebooks, JSON and YAML (`.json`, `.jsonc`, `.jsonl`, `.ndjson`, `.jsonlines`, `.geojson`, `.yaml`, `.yml`; cut along their structure, records as tables; by name, never by content), web pages saved as one file (`.mht`, `.mhtml`), subtitles (`.srt`, `.vtt`, `.webvtt`) | [go-fast-html](https://github.com/AOShei/go-fast-html) |

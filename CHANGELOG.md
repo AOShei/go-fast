@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+Pins go-fast-odf v0.3.0 (after v0.2.2).
+
+- **OpenDocument drawings are read** (go-fast-odf v0.3.0): `.odg`, the
+  template `.otg` and the flat `.fodg`, and the media types
+  `application/vnd.oasis.opendocument.graphics` and `graphics-template`,
+  are routed to go-fast-odf, by name in a directory walk too. A drawing
+  is one part of kind `page` per page, its shapes in reading order, the
+  text of its master page as header or footer. A drawing without a name
+  already went to go-fast-odf, which refused it.
+- **Old files are read without a false warning** (go-fast-odf v0.3.0): a
+  document type declaration that declares nothing, as files of around
+  2005 open their manifest and formulas with, is skipped, not refused.
+- **Checked against v0.1.5 on the public corpus:** output changes in 66
+  of 8,609 dev files: 50 of the 51 `.odg` (the other is a presentation
+  saved as `.odg`, read as one before), all 15 `.fodg`, and one `.odt`
+  that loses a false `input.stream_damaged`. By hash, 21 of 2,852
+  held-out files change: all 16 `.odg` and 4 `.fodg`, and one `.odt`
+  that gains an embedded formula. No other output changes.
+
 ## v0.1.5 (2026-11-26)
 
 Pins go-fast-html v0.6.0 (after v0.5.0).
