@@ -362,3 +362,21 @@ func TestXMLFlags(t *testing.T) {
 		t.Errorf("a missing profile: %d %s", status, errs)
 	}
 }
+
+// TestDataBlockBytes: -data-block-bytes sets the size go-fast-html cuts
+// JSON and YAML to; a negative size stops the command.
+func TestDataBlockBytes(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "a.json")
+	os.WriteFile(p, []byte("[\""+strings.Repeat("a", 600)+"\", \""+strings.Repeat("b", 600)+"\"]"), 0o644)
+	for arg, want := range map[string]int{"-data-block-bytes=0": 2, "-data-block-bytes=4096": 1} {
+		out, errs, status := runCmd(t, "", "-quiet", arg, p)
+		var d gofastcore.Document // one input: one indented document
+		if status != 0 || json.Unmarshal([]byte(out), &d) != nil || len(d.Parts) != 1 || len(d.Parts[0].Blocks) != want {
+			t.Errorf("%s: %d %s", arg, status, errs)
+		}
+	}
+	if _, errs, status := runCmd(t, "", "-quiet", "-data-block-bytes=-1", p); status != 2 || !strings.Contains(errs, "-data-block-bytes") {
+		t.Errorf("negative: %d %s", status, errs)
+	}
+}

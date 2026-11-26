@@ -99,6 +99,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		maxArchive  = flags.Int64("max-archive-bytes", 0, "bytes decompressed from one archive and the archives in it (0: the default, 64 GiB; -1: no limit)")
 		maxMemory   = flags.Int64("max-memory-bytes", 0, "bytes of decompressed archive members held at once by all the workers together (0: the default, 4 GiB); one member larger than it is still read, alone")
 		xmlAttrs    = flags.Bool("xml-attributes", true, "in XML read generically (no profile fits), make each attribute a note; -xml-attributes=false leaves them out, for data-style XML")
+		dataBlock   = flags.Int("data-block-bytes", 0, "the size JSON and YAML are cut to: a value up to this many bytes is one block, a longer one is split into members packed into blocks of about this size (0: the default, 1024)")
 		quiet       = flags.Bool("quiet", false, "say nothing about files that were read; failures are still reported")
 		showVersion = flags.Bool("version", false, "print the version and exit")
 	)
@@ -137,9 +138,13 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	if *jobs < 1 {
 		return fail("-j wants at least 1")
 	}
+	if *dataBlock < 0 {
+		return fail("-data-block-bytes wants a size in bytes, or 0 for the default, not %d", *dataBlock)
+	}
 	c := &config{format: *format, output: *output, dir: *dir, jobs: *jobs, quiet: *quiet, maxDepth: *maxDepth,
 		maxMemory: *maxMemory, maxInput: *maxInput,
-		extractor: &gofast.Extractor{MaxMemberBytes: *maxMember, MaxArchiveBytes: *maxArchive, Charset: *charset}}
+		extractor: &gofast.Extractor{MaxMemberBytes: *maxMember, MaxArchiveBytes: *maxArchive, Charset: *charset,
+			DataBlockBytes: *dataBlock}}
 	if c.maxMemory == 0 {
 		c.maxMemory = 4 << 30
 	}

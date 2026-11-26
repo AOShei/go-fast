@@ -59,11 +59,12 @@ var byExtension = map[string]Kind{
 
 	".html": {LibHTML, "html"}, ".htm": {LibHTML, "html"}, ".xhtml": {LibHTML, "html"}, ".shtml": {LibHTML, "html"},
 	".md": {LibHTML, "md"}, ".markdown": {LibHTML, "md"}, ".mdown": {LibHTML, "md"}, ".mkd": {LibHTML, "md"},
-	".mkdn": {LibHTML, "md"}, ".mdwn": {LibHTML, "md"},
+	".mkdn": {LibHTML, "md"}, ".mdwn": {LibHTML, "md"}, ".mdc": {LibHTML, "md"}, ".qmd": {LibHTML, "md"}, ".rmd": {LibHTML, "md"},
 	".txt": {LibHTML, "txt"}, ".text": {LibHTML, "txt"},
 	".epub": {LibHTML, "epub"}, ".csv": {LibHTML, "csv"}, ".tsv": {LibHTML, "tsv"}, ".tab": {LibHTML, "tsv"},
 	".ipynb": {LibHTML, "ipynb"},
 	".json":  {LibHTML, "json"}, ".jsonl": {LibHTML, "json"}, ".ndjson": {LibHTML, "json"}, ".geojson": {LibHTML, "json"},
+	".jsonc": {LibHTML, "json"}, ".jsonlines": {LibHTML, "json"},
 	".yaml": {LibHTML, "yaml"}, ".yml": {LibHTML, "yaml"},
 	".mht": {LibHTML, "mht"}, ".mhtml": {LibHTML, "mht"},
 	".srt": {LibHTML, "srt"}, ".vtt": {LibHTML, "vtt"}, ".webvtt": {LibHTML, "vtt"},
