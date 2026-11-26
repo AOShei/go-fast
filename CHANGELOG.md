@@ -1,11 +1,19 @@
 # Changelog
 
-## Unreleased
+## v0.1.7 (2026-11-26)
 
-- **go-fast-core v0.1.10** (was v0.1.9). Of the core code this module
-  uses, the only change since v0.1.9 is two new stored kinds: `gofast
-  -stored=` now also accepts `shape_data` and `linked_data`, which Visio
-  drawings in go-fast-ooxml will use.
+Pins go-fast-xml v0.4.1 (after v0.2.1) and go-fast-core v0.1.11 (after v0.1.9).
+
+- **go-fast-core v0.1.11** (was v0.1.9). `gofast -stored=` also accepts
+  the stored kinds `shape_data` and `linked_data` (core v0.1.10), which
+  Visio drawings in go-fast-ooxml will use. Markdown and text join a
+  continued paragraph to the one it continues when only footnotes stand
+  between them, and write the footnotes after it (core v0.1.11): a
+  paragraph cut by a page break, with the notes of the page's foot
+  between, is one paragraph again.
+  Against core v0.1.10 on the public corpus (13,713 files), the JSON,
+  text and Markdown are unchanged: the released go-fast-pdf does not yet
+  give footnotes between the pieces.
 - **go-fast-xml v0.4.1** (was v0.2.1): 26 built-in profiles (were 13).
   New: electronic invoices (Cross Industry Invoice: Factur-X, ZUGFeRD 2,
   XRechnung; UBL: Peppol), DILA case law with KALI and CNIL, Canadian
