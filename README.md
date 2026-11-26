@@ -21,7 +21,7 @@ gofast -format markdown notes.docx       # one document as Markdown
 | OpenDocument text, spreadsheets and presentations, and their flat XML forms | [go-fast-odf](https://github.com/AOShei/go-fast-odf) |
 | RTF | [go-fast-rtf](https://github.com/AOShei/go-fast-rtf) |
 | Email: `.eml`, `.mbox`, Outlook `.msg`, TNEF (`winmail.dat`); calendars (`.ics`, `.ifb`, `.vcs`) and contact lists (`.vcf`, `.vcard`) | [go-fast-email](https://github.com/AOShei/go-fast-email) |
-| HTML, Markdown, plain text, EPUB, CSV, TSV, Jupyter notebooks, JSON and YAML (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.yaml`, `.yml`; as text, never by content), web pages saved as one file (`.mht`, `.mhtml`), subtitles (`.srt`, `.vtt`, `.webvtt`) | [go-fast-html](https://github.com/AOShei/go-fast-html) |
+| HTML, Markdown (also Cursor rules `.mdc`, Quarto `.qmd`, R Markdown `.Rmd`; front matter to the metadata), plain text, EPUB, CSV, TSV, Jupyter notebooks, JSON and YAML (`.json`, `.jsonc`, `.jsonl`, `.ndjson`, `.jsonlines`, `.geojson`, `.yaml`, `.yml`; cut along their structure, records as tables; by name, never by content), web pages saved as one file (`.mht`, `.mhtml`), subtitles (`.srt`, `.vtt`, `.webvtt`) | [go-fast-html](https://github.com/AOShei/go-fast-html) |
 | XML of any schema (`.xml`, `.dita`, `.ditamap`, `.docbook`, `.tei`, `.rss`, `.atom`), with built-in profiles for Akoma Ntoso, HL7 CDA, CLML, DITA, DocBook, Formex, JATS, Légifrance, patents, S1000D, Service-Public, TEI and web feeds (RSS, Atom). A feed is one document, and the HTML of its items is read by go-fast-html as its child documents | [go-fast-xml](https://github.com/AOShei/go-fast-xml) |
 | zip, tar, gzip (`.tar.gz`, `.tgz`, `.gz`) | this module |
 
@@ -114,6 +114,7 @@ gofast [flags] file-or-directory...
 | `-password` | for encrypted files |
 | `-charset LABEL` | the character set (`shift_jis`, `gbk`, `windows-1250`, ...) of text that declares none and whose set is not certain from its bytes; without it such a text file is not read, and text in a message has U+FFFD |
 | `-xml-profile FILE` | a go-fast-xml profile file (see its `PROFILE_FORMAT.md`), tried before the built-in profiles and chosen, as they are, by the root element, so it is safe in a batch of any formats; may be given more than once (`Extractor.XMLProfiles`) |
+| `-data-block-bytes N` | the size go-fast-html cuts JSON and YAML to: a value up to N bytes is one block, a longer one is split into its members, packed into blocks of about N bytes (0: go-fast-html's default, 1,024; `Extractor.DataBlockBytes`) |
 | `-xml-attributes=false` | in XML no profile fits, leave out the note go-fast-xml makes of each attribute, for data-style XML (`Extractor.XMLAttributes`) |
 | `-max-input-bytes`, `-max-decoded-bytes`, `-max-text-bytes`, `-max-depth` | core's limits (`gofastcore.Limits`), for every document; `-max-input-bytes` also bounds standard input and pipes |
 | `-max-member-bytes`, `-max-archive-bytes`, `-max-memory-bytes` | the archive bounds above |

@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+Pins go-fast-html v0.6.0 (after v0.5.0).
+
+- **JSON and YAML are cut along their structure** (go-fast-html v0.6.0):
+  blocks of whole values, 1 KiB by default, with their paths and the
+  comments around them; a list of records cut across blocks (or at the
+  top level) as a table, cells as written; JSON Lines a value a line;
+  JSON with comments. `-data-block-bytes` (`Extractor.DataBlockBytes`)
+  sets the block size.
+- **Markdown front matter** (YAML or TOML) is the first block and fills
+  the metadata (title, authors, description, tags, dates, every other key
+  in `Extra["front_matter.<key>"]`, nulls kept as written).
+- **More names are routed:** `.mdc` (Cursor rules), `.qmd` (Quarto) and
+  `.rmd` (R Markdown) as Markdown; `.jsonc` and `.jsonlines` as JSON.
+- **Checked against v0.1.4 on the public corpus:** output changes only in
+  JSON, JSON Lines, YAML and Markdown with front matter: 178 of their 189
+  dev files and 47 of their 51 held-out files (the dev files unchanged
+  are one block either way, 385 bytes at most). No other output changes,
+  in 8,354 dev files or, by hash, 2,781 held-out files.
+
 ## v0.1.4 (2026-11-26)
 
 Pins go-fast-html v0.5.0 (after v0.4.4), go-fast-email v0.3.0 (after

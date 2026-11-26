@@ -54,6 +54,12 @@ type Extractor struct {
 	// default, or gofastxml.AttributesNone, for data-style XML whose
 	// attributes are keys and codes.
 	XMLAttributes gofastxml.Attributes
+	// DataBlockBytes is the size go-fast-html cuts JSON and YAML to
+	// (gofasthtml.Extractor.DataBlockBytes): a value up to this many bytes
+	// is one block, a longer one is split into its members, packed into
+	// blocks of about this size. Zero or less means go-fast-html's default,
+	// gofasthtml.DefaultDataBlockBytes (1 KiB).
+	DataBlockBytes int
 }
 
 // Formats lists the formats Extract reads: those of every library, and
@@ -122,7 +128,7 @@ func (e *Extractor) ExtractKind(ctx context.Context, k Kind, mimeType string, r 
 		}
 		return doc, err
 	case LibHTML:
-		x := &gofasthtml.Extractor{Format: k.Format, Charset: param(mimeType, "charset")}
+		x := &gofasthtml.Extractor{Format: k.Format, Charset: param(mimeType, "charset"), DataBlockBytes: e.DataBlockBytes}
 		x.Header = strings.EqualFold(param(mimeType, "header"), "present")
 		doc, err := x.Extract(ctx, r, size, opts)
 		if errors.Is(err, gofasthtml.ErrEncodingUnknown) && x.Charset == "" && e.Charset != "" {
