@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.1.10 (2026-11-27)
+
+Pins go-fast-ooxml v0.7.0 (after v0.6.0), go-fast-msbin v0.2.0 (after
+v0.1.5) and go-fast-xml v0.5.0 (after v0.4.1).
+
+- **All the libraries now read with go-fast-core's shared packages.**
+  ooxml, msbin and xml dropped their own copies of the XML scanner, the
+  character-set decoders, the Office package and compound-file readers
+  and the Office helpers, as odf, html, rtf and email did in v0.1.9. Their
+  CHANGELOGs have the details. What changes with it:
+  - **ooxml:** some warning and error messages are reworded. A compound
+    file embedded in a document and damaged is read past the damage and
+    listed as unsupported, where it was listed as failed. Names are kept
+    to 4 KiB. A SpreadsheetML 2003 file that starts with a document type
+    declaration declaring nothing is still sent to go-fast-xml (the
+    umbrella sends any such file there), so nothing changes for it here.
+  - **msbin:** in Word 6/95 documents, a byte the code page leaves
+    undefined in 0x80 to 0x9F is the C1 control (removed as text, counted
+    as `text.control_characters_removed`), where it was U+FFFD counted as
+    `text.unmapped_glyphs`; a lead byte before an ASCII letter keeps the
+    letter; code page 950 decodes the HKSCS pairs. Names are kept to
+    4 KiB.
+  - **xml:** ISO-2022-JP, `cp936` and `latin9` are read. `&#0;` is
+    U+FFFD and counted as a repair, and the `input.repaired` message
+    names it.
+- **Checked against v0.1.9 on the public corpus:** output changes in 3 of
+  10,313 dev files and none of 3,414 held-out files. The three are XML
+  (two XLIFF files and a feed) with a `&#0;`, whose `input.repaired`
+  message now ends "a character reference to U+0000". The changes in
+  Office and legacy Office output that the libraries measured are in
+  their own test files, which this corpus does not hold.
+
 ## v0.1.9 (2026-11-27)
 
 Pins go-fast-core v0.1.13 (after v0.1.11), go-fast-odf v0.3.1 (after
