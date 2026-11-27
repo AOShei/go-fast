@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.1.11 (2026-11-27)
+
+Pins go-fast-core v0.1.14 (after v0.1.13) and go-fast-html v0.7.1
+(after v0.7.0).
+
+- **Office 2003 XML with a document type declaration goes to
+  go-fast-ooxml.** A WordprocessingML 2003 or SpreadsheetML 2003 file, or
+  Flat OPC, whose root comes after one document type declaration that
+  declares nothing (`<!DOCTYPE Workbook>`, or one naming an external DTD)
+  is read by go-fast-ooxml, which reads such files since v0.7.0; it went
+  to go-fast-xml. A declaration with an internal subset, or a second one,
+  still sends the file to go-fast-xml, since go-fast-ooxml refuses it.
+  The scan of a declaration also skips quoted strings now, so a `>`
+  or `[` inside an identifier or an entity's value is not taken for its
+  end or a subset.
+- **html v0.7.1:** a character reference that names no character
+  (`&#0;`, a surrogate, a number past U+10FFFF) is counted in a
+  `text.unmapped_glyphs` warning of its own.
+- **core v0.1.14:** the XML scanner is faster in its default reading,
+  which go-fast-ooxml and go-fast-odf use; a VBA project that names UTF-16
+  as its code page is read as bytes again.
+- **Checked against v0.1.10 on the public corpus:** every output is the
+  same, in 10,313 dev files and 3,414 held-out files.
+
 ## v0.1.10 (2026-11-27)
 
 Pins go-fast-ooxml v0.7.0 (after v0.6.0), go-fast-msbin v0.2.0 (after

@@ -46,8 +46,9 @@ const officeHead = 64 << 10
 
 // officeXML reports whether an input is an Office document saved as one
 // XML file: its root element is Flat OPC's pkg:package, Word 2003's
-// w:wordDocument or Excel 2003's Workbook, in their namespaces, with no
-// document type declaration before it. The first sniffBytes are looked
+// w:wordDocument or Excel 2003's Workbook, in their namespaces, with at
+// most one document type declaration before it, which declares nothing
+// (no internal subset), as go-fast-ooxml reads them. The first sniffBytes are looked
 // at, and, when the root is not reached within them, up to officeHead.
 // The markup is read in any encoding that writes ASCII as single bytes
 // (UTF-8, ISO 8859, the Windows code pages, Shift JIS, GBK, EUC-KR,
@@ -72,8 +73,11 @@ func officeXML(r io.ReaderAt, size int64) bool {
 // does, so that more of the input could decide.
 func officeRoot(head []byte) (ok, more bool) {
 	e := firstElement(xmlText(head, true))
-	if e.dtd {
-		return false, false // go-fast-ooxml reads no document type declaration
+	if e.subset || e.dtds > 1 {
+		// go-fast-ooxml reads a document type declaration only as
+		// go-fast-core's xmlscan accepts one: before the root, the only
+		// one, declaring nothing.
+		return false, false
 	}
 	if !e.found || !e.closed {
 		return false, e.cut
@@ -128,6 +132,8 @@ type element struct {
 	found   bool   // an element begins in head, before any text
 	closed  bool   // its start tag ends in head
 	dtd     bool   // a document type declaration comes first
+	dtds    int    // the document type declarations before the element
+	subset  bool   // one of them has an internal subset
 	cut     bool   // head ends before an element, or its start tag, ends
 }
 
@@ -159,20 +165,32 @@ func firstElement(head []byte) (e element) {
 		case bytes.HasPrefix(head, []byte("<!")):
 			// A document type declaration, with any internal subset.
 			e.dtd = true
+			e.dtds++
 			if f := bytes.Fields(head[2:min(len(head), 256)]); len(f) > 1 && strings.EqualFold(string(f[0]), "DOCTYPE") {
 				e.doctype = string(f[1])
 				if i := strings.IndexAny(e.doctype, ">["); i >= 0 {
 					e.doctype = e.doctype[:i]
 				}
 			}
-			depth, i := 0, 2
+			// Quoted strings (a public or system identifier, an entity's
+			// value) can hold brackets and '>'.
+			depth, i, quote := 0, 2, byte(0)
+		scan:
 			for ; i < len(head); i++ {
-				if c := head[i]; c == '[' {
+				switch c := head[i]; {
+				case quote != 0:
+					if c == quote {
+						quote = 0
+					}
+				case c == '"' || c == '\'':
+					quote = c
+				case c == '[':
 					depth++
-				} else if c == ']' {
+					e.subset = true
+				case c == ']':
 					depth--
-				} else if c == '>' && depth <= 0 {
-					break
+				case c == '>' && depth <= 0:
+					break scan
 				}
 			}
 			if i >= len(head) {

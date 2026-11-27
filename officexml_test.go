@@ -62,7 +62,8 @@ func utf16(s string, bigEndian, bom bool) []byte {
 
 // TestDetectOfficeXML: an Office document saved as XML goes to go-fast-ooxml
 // by its root element and namespace, whatever its name or media type says,
-// in the encodings Office writes; other XML stays with go-fast-xml.
+// in the encodings Office writes, after a document type declaration that
+// declares nothing; other XML stays with go-fast-xml.
 func TestDetectOfficeXML(t *testing.T) {
 	ooxml, xml, html := Kind{LibOOXML, ""}, Kind{LibXML, ""}, Kind{LibHTML, "html"}
 	workbook := func(decl, before string) []byte {
@@ -91,10 +92,14 @@ func TestDetectOfficeXML(t *testing.T) {
 		{"UTF-16BE", "", "", utf16(`<?xml version="1.0" encoding="UTF-16"?><Workbook xmlns="`+nsSpreadsheetML+`"/>`, true, true), ooxml},
 		{"UTF-16LE, no BOM", "x.xml", "", utf16(`<?xml version="1.0" encoding="UTF-16"?><Workbook xmlns="`+nsSpreadsheetML+`"/>`, false, false), ooxml},
 		{"root past 4 KiB", "x.xml", "", workbook(`<?xml version="1.0"?>`, "<!--"+strings.Repeat("x", 6000)+"-->"), ooxml},
+		{"a declaration that declares nothing", "x.xml", "", workbook(`<?xml version="1.0"?>`, `<!DOCTYPE Workbook>`), ooxml},
+		{"one with an external DTD", "x.xml", "", workbook(`<?xml version="1.0"?>`, `<!DOCTYPE Workbook SYSTEM "a[1]>.dtd">`), ooxml},
+		{"one in Word 2003", "x.xml", "", []byte(`<?xml version="1.0"?><!DOCTYPE w:wordDocument><w:wordDocument xmlns:w="` + nsWordML + `"/>`), ooxml},
 		{"root tag past 4 KiB", "x.xml", "", []byte(`<?xml version="1.0"?><Workbook` + strings.Repeat(` a="1"`, 1000) + ` xmlns="` + nsSpreadsheetML + `"/>`), ooxml},
 		// Not Office.
 		{"root past 64 KiB", "x.xml", "", workbook(`<?xml version="1.0"?>`, "<!--"+strings.Repeat("x", 70000)+"-->"), xml},
-		{"document type", "x.xml", "", workbook(`<?xml version="1.0"?>`, `<!DOCTYPE Workbook>`), xml},
+		{"a declaration with an internal subset", "x.xml", "", workbook(`<?xml version="1.0"?>`, `<!DOCTYPE Workbook [<!ENTITY a "b">]>`), xml},
+		{"two declarations", "x.xml", "", workbook(`<?xml version="1.0"?>`, `<!DOCTYPE Workbook><!DOCTYPE Workbook>`), xml},
 		{"other namespace", "x.xml", "", []byte(`<?xml version="1.0"?><Workbook xmlns="urn:example"/>`), xml},
 		{"no namespace", "x.xml", "", []byte(`<?xml version="1.0"?><Workbook/>`), xml},
 		{"prefix not bound", "x.xml", "", []byte(`<?xml version="1.0"?><wordDocument xmlns:w="` + nsWordML + `"/>`), xml},
@@ -120,6 +125,7 @@ func TestOfficeXMLExtract(t *testing.T) {
 		{"doc.xml", wordML, "wordml", "", "Hello from Word 2003."},
 		{"book.xml", spreadsheetML, "spreadsheetml", "", "North"},
 		{"flat.xml", flatOPC, "docx", "flat_opc", "Hello from Flat OPC."},
+		{"doctype.xml", strings.Replace(spreadsheetML, "<Workbook", "<!DOCTYPE Workbook>\n<Workbook", 1), "spreadsheetml", "", "North"},
 	} {
 		doc, err := extractNamed(&Extractor{}, c.name, c.body)
 		if err != nil {

@@ -2,7 +2,7 @@
 
 The front door of the go-fast libraries. It reads a file of any of their formats by sending it to the library that reads it, opens zip, tar and gzip archives, and reads many files in parallel. Everything comes out in the shared document model, `gofastcore.Document` (`github.com/AOShei/go-fast-core`).
 
-**Status: v0.1.10 (2026-11-27).** The changes are in [`CHANGELOG.md`](CHANGELOG.md).
+**Status: v0.1.11 (2026-11-27).** The changes are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ```
 go install github.com/AOShei/go-fast/cmd/gofast@latest
@@ -40,7 +40,7 @@ gofast -format markdown notes.docx       # one document as Markdown
    - Binary input (images, audio, executables) is read by none.
    - Anything else is what go-fast-html makes of it: HTML when it is markup, else plain text.
 
-**Office documents saved as XML** go to go-fast-ooxml, whichever of the steps above sent them to go-fast-xml (a `.xml` name, an XML media type, or the bytes). They are known by the root element and its namespace, within the first 64 KiB, as go-fast-ooxml knows them: Flat OPC's `pkg:package` (read as `docx`, `xlsx` or `pptx`, with `extra.packaging` `flat_opc`), Word 2003's `w:wordDocument` (format `wordml`) and Excel 2003's `Workbook` (format `spreadsheetml`). XML with a document type declaration stays with go-fast-xml. The root is found in UTF-8, UTF-16 and the single- and double-byte sets Office writes (the Windows code pages, ISO 8859, Shift_JIS, GBK, EUC-KR, Big5). The media types `application/vnd.ms-wordml` and `application/vnd.ms-spreadsheetml` go to go-fast-ooxml too.
+**Office documents saved as XML** go to go-fast-ooxml, whichever of the steps above sent them to go-fast-xml (a `.xml` name, an XML media type, or the bytes). They are known by the root element and its namespace, within the first 64 KiB, as go-fast-ooxml knows them: Flat OPC's `pkg:package` (read as `docx`, `xlsx` or `pptx`, with `extra.packaging` `flat_opc`), Word 2003's `w:wordDocument` (format `wordml`) and Excel 2003's `Workbook` (format `spreadsheetml`). A document type declaration before the root is accepted as go-fast-ooxml accepts it: one, declaring nothing (no internal subset); XML with one that has an internal subset, or with two, stays with go-fast-xml. The root is found in UTF-8, UTF-16 and the single- and double-byte sets Office writes (the Windows code pages, ISO 8859, Shift_JIS, GBK, EUC-KR, Big5). The media types `application/vnd.ms-wordml` and `application/vnd.ms-spreadsheetml` go to go-fast-ooxml too.
 
 **Office 97-2003 files** are decided by their bytes even when their name (`.doc`, `.dot`, `.xls`, `.xlt`, `.xla`, `.ppt`, `.pps`, `.pot`) or media type (`application/msword`, `application/vnd.ms-excel`, `application/vnd.ms-powerpoint`) says what they are. A compound file goes to go-fast-msbin when its directory holds a Word, Excel or PowerPoint file. Other bytes go where they say: RTF, HTML or XML saved as `.doc` or `.xls`, a zip named `.xls`. Bytes no library reads (an Excel 2 to 4 workbook, a Word 2 document) go to go-fast-msbin, which says what the file is. An Outlook message named `.doc` is still a message. A compound file named as Office that go-fast-msbin's `Detect` does not name (its directory is damaged) and go-fast-email does not read gets go-fast-msbin's error.
 
