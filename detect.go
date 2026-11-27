@@ -15,7 +15,7 @@ import (
 // The libraries an input can be routed to, and the archive formats this
 // package opens itself.
 const (
-	LibPDF   = "pdf"   // go-fast-pdf
+	LibPDF   = "pdf"   // go-fast-pdf: PDF, XPS and OpenXPS
 	LibOOXML = "ooxml" // go-fast-ooxml: Word, Excel, PowerPoint 2007 and later, Visio 2013 and later
 	LibMSBin = "msbin" // go-fast-msbin: Word, Excel and PowerPoint 97-2003
 	LibODF   = "odf"   // go-fast-odf: OpenDocument
@@ -42,7 +42,7 @@ func (k Kind) IsArchive() bool { return k.Library == LibArchive }
 
 // byExtension routes by the extension of a name, lowercase with its dot.
 var byExtension = map[string]Kind{
-	".pdf": {LibPDF, ""},
+	".pdf": {LibPDF, ""}, ".xps": {LibPDF, ""}, ".oxps": {LibPDF, ""},
 
 	".docx": {LibOOXML, ""}, ".docm": {LibOOXML, ""}, ".dotx": {LibOOXML, ""}, ".dotm": {LibOOXML, ""},
 	".xlsx": {LibOOXML, ""}, ".xlsm": {LibOOXML, ""}, ".xltx": {LibOOXML, ""}, ".xltm": {LibOOXML, ""}, ".xlsb": {LibOOXML, ""},
@@ -84,7 +84,7 @@ var byExtension = map[string]Kind{
 
 // byMIME routes by a declared media type, lowercase without parameters.
 var byMIME = map[string]Kind{
-	"application/pdf": {LibPDF, ""},
+	"application/pdf": {LibPDF, ""}, "application/vnd.ms-xpsdocument": {LibPDF, ""}, "application/oxps": {LibPDF, ""},
 
 	"application/vnd.openxmlformats-officedocument.wordprocessingml.document":   {LibOOXML, ""},
 	"application/vnd.openxmlformats-officedocument.wordprocessingml.template":   {LibOOXML, ""},
@@ -154,7 +154,10 @@ const sniffBytes = 4096
 // for text/plain, which is text, the bytes:
 //
 //   - "%PDF-1." or "%PDF-2." in the first 1 KiB is PDF;
-//   - a zip archive is Office if it has [Content_Types].xml, or a
+//   - a zip archive is XPS or OpenXPS (go-fast-pdf's) if a package
+//     relationship leads to a fixed document sequence (type
+//     .../fixedrepresentation, in either namespace), as go-fast-pdf
+//     tells them; otherwise Office if it has [Content_Types].xml, or a
 //     package relationship to a Visio document (some programs write
 //     Visio drawings with no [Content_Types].xml), OpenDocument or EPUB
 //     if its mimetype member says so, and otherwise an archive;
@@ -377,11 +380,22 @@ func sniffZip(r io.ReaderAt, size int64) Kind {
 	if err != nil {
 		return Kind{LibArchive, "zip"}
 	}
+	// An XPS document is a package too, with a content-types table: its
+	// relationships decide first.
+	for _, f := range z.File {
+		if f.Name == "_rels/.rels" && f.UncompressedSize64 <= relsBytes {
+			switch packageRels(f) {
+			case relsXPS:
+				return Kind{LibPDF, ""}
+			case relsVisio:
+				return Kind{LibOOXML, ""}
+			}
+			break
+		}
+	}
 	for i, f := range z.File {
 		switch {
 		case f.Name == "[Content_Types].xml":
-			return Kind{LibOOXML, ""}
-		case f.Name == "_rels/.rels" && f.UncompressedSize64 <= relsBytes && visioRels(f):
 			return Kind{LibOOXML, ""}
 		case i == 0 && f.Name == "mimetype" && f.UncompressedSize64 < 256:
 			rc, err := f.Open()
@@ -409,17 +423,37 @@ const relsBytes = 64 << 10
 // document.
 const visioRelType = "http://schemas.microsoft.com/visio/2010/relationships/document"
 
-// visioRels reports whether a package's relationships member names a
-// Visio document: a zip with no [Content_Types].xml that go-fast-ooxml
-// reads through its relationships.
-func visioRels(f *zip.File) bool {
+// The types of a package's relationship to an XPS or OpenXPS document's
+// fixed document sequence, as go-fast-pdf reads them.
+const (
+	xpsRelType  = "http://schemas.microsoft.com/xps/2005/06/fixedrepresentation"
+	oxpsRelType = "http://schemas.openxps.org/oxps/v1.0/fixedrepresentation"
+)
+
+// What a package's relationships member says the package is.
+const (
+	relsOther = iota
+	relsXPS   // XPS or OpenXPS: go-fast-pdf's
+	relsVisio // a Visio document, which go-fast-ooxml reads with or without [Content_Types].xml
+)
+
+// packageRels says what a package's relationships member names: an XPS
+// or OpenXPS document, a Visio document, or neither.
+func packageRels(f *zip.File) int {
 	rc, err := f.Open()
 	if err != nil {
-		return false
+		return relsOther
 	}
 	defer rc.Close()
 	b, _ := io.ReadAll(io.LimitReader(rc, relsBytes))
-	return bytes.Contains(b, []byte(visioRelType))
+	switch {
+	case bytes.Contains(b, []byte(`"`+xpsRelType+`"`)) || bytes.Contains(b, []byte(`"`+oxpsRelType+`"`)) ||
+		bytes.Contains(b, []byte(`'`+xpsRelType+`'`)) || bytes.Contains(b, []byte(`'`+oxpsRelType+`'`)):
+		return relsXPS
+	case bytes.Contains(b, []byte(visioRelType)):
+		return relsVisio
+	}
+	return relsOther
 }
 
 // messageHeaders reports whether an input begins with the header lines of

@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.1.12 (2026-11-27)
+
+Pins go-fast-pdf v0.6.0 (after v0.5.0), go-fast-ooxml v0.7.1 (after
+v0.7.0), go-fast-msbin v0.2.1 (after v0.2.0), go-fast-xml v0.5.1 (after
+v0.5.0), go-fast-html v0.7.2 (after v0.7.1) and go-fast-core v0.1.15
+(after v0.1.14).
+
+- **XPS and OpenXPS are read, by go-fast-pdf.** By name (`.xps`,
+  `.oxps`), by media type (`application/vnd.ms-xpsdocument`,
+  `application/oxps`) or by the bytes: a zip archive whose package
+  relationships lead to a fixed document sequence (type
+  `.../fixedrepresentation`, in either namespace), as go-fast-pdf tells
+  them. That test comes before the one for Office, since an XPS document
+  has a content-types table as an Office file does; such files went to
+  go-fast-ooxml, which refused them. An encrypted XPS document, a
+  compound file, goes to go-fast-pdf by its name, which says what
+  protects it; it went to go-fast-email, which refused it as an unknown
+  compound file.
+- **The `&#0;` warning everywhere.** ooxml v0.7.1 and xml v0.5.1 report
+  character references to no character as `text.unmapped_glyphs`, as
+  html does; xml's `input.repaired` message is as in v0.4.1 again. html
+  v0.7.2 says such references "are read as U+FFFD", as ooxml does (xml
+  says "appear as" until its next release).
+- **Checked against v0.1.11 on the public corpus:** output changes in 14
+  of 10,313 dev files and 3 of 3,414 held-out files. In dev, the 11 XPS
+  files: 8 are read (the XPS specification, 453 pages, among them), where
+  ooxml refused them, and 3 encrypted ones are refused by go-fast-pdf,
+  which says what encrypts them; and three XML files whose
+  `input.repaired` message is v0.4.1's again. In held-out (counted only),
+  the 3 XPS files.
+
 ## v0.1.11 (2026-11-27)
 
 Pins go-fast-core v0.1.14 (after v0.1.13) and go-fast-html v0.7.1
