@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.1.9 (2026-11-27)
+
+Pins go-fast-core v0.1.13 (after v0.1.11), go-fast-odf v0.3.1 (after
+v0.3.0), go-fast-html v0.7.0 (after v0.6.0), go-fast-rtf v0.3.0 (after
+v0.2.1), go-fast-email v0.4.0 (after v0.3.0) and go-fast-pdf v0.5.0
+(after v0.4.0).
+
+- **One copy of the shared code.** go-fast-core now holds the readers
+  more than one library needs: character sets (`charset`), XML
+  (`xmlscan`), Office packages (`opc`), compound files (`cfb`), MIME
+  (`rfc822`), HTML character references (`entity`) and the text
+  conventions and Office helpers. odf, html, rtf and email use them in
+  these releases; ooxml, msbin, xml and pdf follow in theirs. New with
+  them: html decodes ISO-2022-JP, email decodes KOI8, the ISO-8859 parts
+  and Big5 with HKSCS, GBK byte 0x80 is the euro sign everywhere, and a
+  byte a code page leaves undefined in 0x80 to 0x9F is the C1 control
+  (removed as text), as the WHATWG Encoding Standard has it.
+- **go-fast-pdf v0.5.0:** tables in files without tags, footnotes as
+  blocks of kind footnote, paragraphs continued past them (its CHANGELOG
+  has the measurements).
+- **Checked against main on the public corpus:** output changes in 6 of
+  10,313 dev files and 6 of 3,414 held-out files. In dev: three saved web
+  pages whose subject, in ISO-2022-JP, is now decoded; a vCard whose value
+  ends in a form feed, now a line break; an OpenDocument drawing that is
+  refused either way, with its message reworded; a Factur-X invoice whose
+  six short lines pdf v0.5.0 reads as paragraphs, not headings. In
+  held-out (counted only): three saved web pages, one ics, one msg and
+  one XML invoice.
+
 ## v0.1.8 (2026-11-27)
 
 Pins go-fast-ooxml v0.6.0 (after v0.5.3).
