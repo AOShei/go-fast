@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.8 (2026-11-27)
 
 Pins go-fast-ooxml v0.6.0 (after v0.5.3).
 
