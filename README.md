@@ -2,7 +2,7 @@
 
 The front door of the go-fast libraries. It reads a file of any of their formats by sending it to the library that reads it, opens zip, tar and gzip archives, and reads many files in parallel. Everything comes out in the shared document model, `gofastcore.Document` (`github.com/AOShei/go-fast-core`).
 
-**Status: v0.1.11 (2026-11-27).** The changes are in [`CHANGELOG.md`](CHANGELOG.md).
+**Status: v0.1.12 (2026-11-27).** The changes are in [`CHANGELOG.md`](CHANGELOG.md).
 
 ```
 go install github.com/AOShei/go-fast/cmd/gofast@latest
@@ -15,7 +15,7 @@ gofast -format markdown notes.docx       # one document as Markdown
 
 | Formats | Library |
 |---|---|
-| PDF | [go-fast-pdf](https://github.com/AOShei/go-fast-pdf) |
+| PDF; XPS and OpenXPS (`.xps`, `.oxps`) | [go-fast-pdf](https://github.com/AOShei/go-fast-pdf) |
 | Word, Excel and PowerPoint 2007 and later (`.docx`, `.xlsx`, `.xlsb`, `.pptx` and their macro and template variants); Visio 2013 and later: drawings, templates and stencils, with and without macros (`.vsdx`, `.vsdm`, `.vstx`, `.vstm`, `.vssx`, `.vssm`; the binary `.vsd` and the XML `.vdx` of Visio 2003-2010 are not read as Visio); and Office documents saved as one XML file: Flat OPC, Word 2003's XML document and Excel 2003's XML spreadsheet | [go-fast-ooxml](https://github.com/AOShei/go-fast-ooxml) |
 | Word, Excel and PowerPoint 97-2003 (`.doc`, `.xls`, `.ppt` and their templates and shows) | [go-fast-msbin](https://github.com/AOShei/go-fast-msbin) |
 | OpenDocument text, spreadsheets, presentations and drawings (`.odg`), and their flat XML forms | [go-fast-odf](https://github.com/AOShei/go-fast-odf) |
@@ -30,10 +30,10 @@ gofast -format markdown notes.docx       # one document as Markdown
 2. The extension of the name.
 3. The bytes:
    - `%PDF-1.` or `%PDF-2.` in the first 1 KiB is PDF.
-   - A zip archive is Office if it has `[Content_Types].xml`, or if its package relationships (`_rels/.rels`) name a Visio document (some programs write Visio drawings without `[Content_Types].xml`); OpenDocument or EPUB if its `mimetype` member says so; and otherwise an archive.
+   - A zip archive is XPS or OpenXPS, go-fast-pdf's, if its package relationships (`_rels/.rels`) lead to a fixed document sequence (type `…/fixedrepresentation`, in the XPS or the OpenXPS namespace), as go-fast-pdf tells them; an XPS document has `[Content_Types].xml` as an Office file has. Otherwise it is Office if it has `[Content_Types].xml`, or if its package relationships (`_rels/.rels`) name a Visio document (some programs write Visio drawings without `[Content_Types].xml`); OpenDocument or EPUB if its `mimetype` member says so; and otherwise an archive.
    - gzip and tar are archives.
    - `{\rtf` is RTF.
-   - An OLE compound file is Word, Excel or PowerPoint 97-2003 (go-fast-msbin) when its directory holds those formats' streams (go-fast-msbin's `Detect`), and otherwise email.
+   - An OLE compound file is Word, Excel or PowerPoint 97-2003 (go-fast-msbin) when its directory holds those formats' streams (go-fast-msbin's `Detect`), and otherwise email. An encrypted XPS document is a compound file too; its `.xps` or `.oxps` name sends it to go-fast-pdf (step 2), which says what it is and refuses it.
    - A TNEF stream, a mailbox's `From ` line (an address, then a date with a time) or a message's header lines (at least two of the headers messages have, one of them `From`, `Received`, `Return-Path`, `Message-ID`, `MIME-Version` or `Delivered-To`) are email.
    - An OpenDocument flat XML file is OpenDocument.
    - XML is go-fast-xml's: input that begins with an XML declaration (`<?xml`), that has a document type declaration naming a root element other than `html`, or whose first element declares a namespace. A first element named `html` or `svg`, or in the XHTML or SVG namespace, stays with go-fast-html. XML with none of these marks (no declaration, no document type, no namespace) is read as HTML, unless its name or media type says XML.
