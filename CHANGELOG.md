@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.1.13 (2026-11-28)
+
+Pins go-fast-core v0.1.17 (after v0.1.15), go-fast-ooxml v0.7.3 (after
+v0.7.1), go-fast-xml v0.5.3 (after v0.5.1), go-fast-pdf v0.6.2 (after
+v0.6.0), go-fast-msbin v0.2.2 (after v0.2.1) and go-fast-html v0.7.3
+(after v0.7.2). No routing changes.
+
+- **Bytes that are not UTF-8 are checked once, by core's XML scanner,**
+  and counted alike. go-fast-ooxml, go-fast-xml and go-fast-pdf report
+  them as `text.unmapped_glyphs` ("N byte sequences are not valid UTF-8
+  and are read as U+FFFD").
+- **Encrypted packages are told by core's `envelope`**, in go-fast-ooxml,
+  go-fast-pdf and go-fast-msbin. A rights-managed file known only by an
+  `EUL-` licence is now refused as rights-managed.
+- **go-fast-html's warning for bytes not valid in the encoding** says
+  "are read as U+FFFD" (was "appear as"), in the singular for one.
+
 ## v0.1.12 (2026-11-27)
 
 Pins go-fast-pdf v0.6.0 (after v0.5.0), go-fast-ooxml v0.7.1 (after
